@@ -19,8 +19,17 @@ type DockerInitializeTask struct {
 }
 
 // DockerInitializeTask initializes a pipeline execution
+type DockerInitTaskRequest struct {}
+type DockerInitTaskResponse struct {}
 func (t *DockerInitializeTask) Handle(req *types.Task, w io.Writer) {
-  // Implementation for the task
+  // Implement the task
+  taskBytes, err := req.Data.MarshalJSON()
+  if err != nil {
+	  logger.WriteJSON(w, Error{})
+	  return err
+  }
+  d := &DockerInitTaskRequest{}
+  json.Unmarshal(taskBytes, d)
   // Write the response to writer
   obj := DockerExecutionResponse{}
   logger.WriteJSON(w, obj)
@@ -29,15 +38,21 @@ func (t *DockerInitializeTask) Handle(req *types.Task, w io.Writer) {
 // These routes can be registered with the router
 router := router.NewRouter(router.RouteMap)
 
+// Generate a token
+token := delegate.Token(...)
+
+// Create a delegate client
+client := delegate.Client(...)
+
 // The poller needs a client that interacts with the task management system and a router to route the tasks
 poller := poller.New(id, secret, name, client, router)
 (there is a sample client for the harness manager included in this repo)
 
 // Register the runner
 err = poller.Register(ctx, interval)
-	if err != nil {
-		logrus.Errorf("could not register runner with error: %s", err)
-		return err
+if err != nil {
+	logrus.Errorf("could not register runner with error: %s", err)
+	return err
 }
 
 // Start polling for tasks
