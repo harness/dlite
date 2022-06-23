@@ -3,13 +3,14 @@ package poller
 import (
 	"bytes"
 	"context"
-	"dlite/client"
-	"dlite/router"
 	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/wings-software/dlite/client"
+	"github.com/wings-software/dlite/router"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

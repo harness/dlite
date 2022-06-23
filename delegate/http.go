@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"dlite/client"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +12,9 @@ import (
 	"net/http"
 	"time"
 
-	"dlite/logger"
+	"github.com/wings-software/dlite/client"
+
+	"github.com/wings-software/dlite/logger"
 )
 
 const (

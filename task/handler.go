@@ -1,8 +1,9 @@
 package task
 
 import (
-	"dlite/client"
 	"io"
+
+	"github.com/wings-software/dlite/client"
 )
 
 // Handler is an interface for a task implementation

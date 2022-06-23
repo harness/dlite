@@ -1,7 +1,7 @@
 package router
 
 import (
-	"dlite/task"
+	"github.com/wings-software/dlite/task"
 )
 
 type Router interface {

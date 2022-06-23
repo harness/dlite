@@ -1,4 +1,4 @@
-module dlite
+module github.com/wings-software/dlite
 
 go 1.17
 
