@@ -37,7 +37,7 @@ func New(accountID, accountSecret, name string, client client.Client, router rou
 
 // Register registers the runner and runs a background thread which keeps pinging the server
 // at a period of interval.
-func (p *Poller) Register(ctx context.Context, interval time.Duration) error {
+func (p *Poller) Register(ctx context.Context, tags []string, interval time.Duration) error {
 	host, err := os.Hostname()
 	if err != nil {
 		return errors.Wrap(err, "could not get host name")
@@ -54,6 +54,7 @@ func (p *Poller) Register(ctx context.Context, interval time.Duration) error {
 		HostName:           host,
 		IP:                 p.Name, // TODO: We should change this to actual IP but that was creating issues with restarts
 		SupportedTaskTypes: p.Router.Routes(),
+		Tags:               tags,
 	}
 	err = p.Client.Register(ctx, req)
 	if err != nil {

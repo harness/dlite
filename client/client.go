@@ -22,6 +22,7 @@ type (
 		SequenceNum        int      `json:"sequenceNum"`
 		IP                 string   `json:"ip"`
 		SupportedTaskTypes []string `json:"supportedTaskTypes"`
+		Tags               []string `json:"tags"`
 	}
 
 	TaskEventsResponse struct {
