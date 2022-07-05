@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -119,6 +120,11 @@ func (p *Poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 	if err != nil {
 		return err
 	}
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(task)
+	if err != nil {
+		return err
+	}
 	g, _ := json.Marshal(task)
 	fmt.Println("acquired task is: ", string(g))
 	if task.Type == "" {
@@ -129,17 +135,23 @@ func (p *Poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 		logrus.Errorf("[Thread %d]: Task ID of type: %s was never meant to reach this delegate", i, task.Type)
 		return nil
 	}
-	var buf bytes.Buffer
-	p.Router.Route(task.Type).Handle(task, &buf)
-	resp := &client.TaskResponse{
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "/", &buf)
+	if err != nil {
+		return err
+	}
+	var buf2 bytes.Buffer
+	resp := &response{buf: buf2}
+	p.Router.Route(task.Type).ServeHTTP(resp, req)
+	taskResponse := &client.TaskResponse{
 		ID:   task.ID,
-		Data: buf.Bytes(),
+		Data: resp.buf.Bytes(),
 		Code: "OK",
 		Type: task.Type,
 	}
 	ga, _ := json.Marshal(resp)
 	fmt.Println("sending response back: ", string(ga))
-	err = p.Client.SendStatus(ctx, p.Name, id, resp)
+	err = p.Client.SendStatus(ctx, p.Name, id, taskResponse)
 	if err != nil {
 		return err
 	}
@@ -166,4 +178,19 @@ func (p *Poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 			}
 		}
 	}()
+}
+
+type response struct {
+	buf bytes.Buffer
+}
+
+func (*response) Header() http.Header {
+	return nil
+}
+
+func (*response) WriteHeader(statusCode int) {
+}
+
+func (r *response) Write(p []byte) (n int, err error) {
+	return r.buf.Write(p)
 }
