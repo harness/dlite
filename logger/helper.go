@@ -45,6 +45,11 @@ func WriteInternalError(w http.ResponseWriter, err error) {
 // writeJSON writes the json-encoded representation of v to
 // the response body.
 func WriteJSON(w http.ResponseWriter, v interface{}, status int) {
+	for k, v := range noCacheHeaders {
+		w.Header().Set(k, v)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.Encode(v)
