@@ -21,18 +21,28 @@ type DockerInitializeTask struct {
 // DockerInitializeTask initializes a pipeline execution
 type DockerInitTaskRequest struct {}
 type DockerInitTaskResponse struct {}
-func (t *DockerInitializeTask) Handle(req *types.Task, w io.Writer) {
-  // Implement the task
-  taskBytes, err := req.Data.MarshalJSON()
-  if err != nil {
-	  logger.WriteJSON(w, Error{})
-	  return err
-  }
+func (t *DockerInitializeTask) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+  task := &client.Task{}
+	err := json.NewDecoder(r.Body).Decode(task)
+	if err != nil {
+		logger.WriteBadRequest(w, err)
+		return
+	}
+	// Unmarshal the task data
+	taskBytes, err := task.Data.MarshalJSON()
+	if err != nil {
+		logger.WriteBadRequest(w, err)
+		return
+	}
   d := &DockerInitTaskRequest{}
-  json.Unmarshal(taskBytes, d)
+  err = json.Unmarshal(taskBytes, d)
+  if err != nil {
+    logger.WriteBadRequest(w, err)
+    return
+  }
   // Write the response to writer
   obj := DockerExecutionResponse{}
-  logger.WriteJSON(w, obj)
+  logger.WriteJSON(w, obj, 200)
 }
 
 // These routes can be registered with the router

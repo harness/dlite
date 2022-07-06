@@ -95,7 +95,6 @@ func (p *Poller) Poll(ctx context.Context, n int, interval time.Duration) {
 	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
-			logrus.Infof("initialized thread %d", i)
 			for {
 				select {
 				case <-ctx.Done():
@@ -110,6 +109,7 @@ func (p *Poller) Poll(ctx context.Context, n int, interval time.Duration) {
 			}
 		}(i)
 	}
+	logrus.Infof("initialized %d threads succesfully and starting polling for tasks", n)
 	wg.Wait()
 }
 
