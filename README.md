@@ -23,17 +23,17 @@ type DockerInitTaskRequest struct {}
 type DockerInitTaskResponse struct {}
 func (t *DockerInitializeTask) ServeHTTP(w http.ResponseWriter, req *http.Request) {
   task := &client.Task{}
-	err := json.NewDecoder(r.Body).Decode(task)
-	if err != nil {
-		logger.WriteBadRequest(w, err)
-		return
-	}
-	// Unmarshal the task data
-	taskBytes, err := task.Data.MarshalJSON()
-	if err != nil {
-		logger.WriteBadRequest(w, err)
-		return
-	}
+  err := json.NewDecoder(r.Body).Decode(task)
+  if err != nil {
+    logger.WriteBadRequest(w, err)
+    return
+  }
+  // Unmarshal the task data
+  taskBytes, err := task.Data.MarshalJSON()
+  if err != nil {
+     logger.WriteBadRequest(w, err)
+     return
+  }
   d := &DockerInitTaskRequest{}
   err = json.Unmarshal(taskBytes, d)
   if err != nil {
