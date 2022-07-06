@@ -1,13 +1,14 @@
 package task
 
 import (
-	"io"
-
-	"github.com/wings-software/dlite/client"
+	"net/http"
 )
 
-// Handler is an interface for a task implementation
+// Task Handlers should implement the HTTP handler interface
+// This interface can be extended later to support other communication mechanisms
 type Handler interface {
-	// Handle implements a task and writes back the response
-	Handle(*client.Task, io.Writer)
+	// http Handler implements ServeHTTP(ResponseWriter, *Request)
+	// For Harness, the request contains a task definition in the body and the task response
+	// should be written to the ResponseWriter
+	http.Handler
 }
