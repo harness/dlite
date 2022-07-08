@@ -6,14 +6,17 @@ A golang client which can interact and accept tasks from the Harness manager (or
 
 A way to use this client would be:
 
+Define task implementations:
 ```
-// Define task implementations
 var RouteMap = map[string]task.Handler{
 	"CI_DOCKER_INITIALIZE_TASK": &setup.DockerInitializeTask{},
 	"CI_DOCKER_EXECUTE_TASK":    &step.DockerExecuteTask{},
 	"CI_DOCKER_CLEANUP_TASK":    &cleanup.DockerCleanupTask{},
 }
+```
 
+Define a task. A task needs to implement the HTTP handler interface:
+```
 // A task must implement the handler interface. Example:
 type DockerInitializeTask struct {
 }
@@ -44,10 +47,16 @@ func (t *DockerInitializeTask) ServeHTTP(w http.ResponseWriter, req *http.Reques
   obj := DockerExecutionResponse{}
   logger.WriteJSON(w, obj, 200)
 }
+```
 
+Register the routes:
+```
 // These routes can be registered with the router
 router := router.NewRouter(router.RouteMap)
+```
 
+Create a client and start polling for tasks:
+```
 // Generate a token
 token := delegate.Token(...)
 
@@ -56,17 +65,9 @@ client := delegate.Client(...)
 
 // The poller needs a client that interacts with the task management system and a router to route the tasks
 poller := poller.New(id, secret, name, client, router)
-(there is a sample client for the harness manager included in this repo)
-
-// Register the runner
-err = poller.Register(ctx, interval)
-if err != nil {
-	logrus.Errorf("could not register runner with error: %s", err)
-	return err
-}
 
 // Start polling for tasks
-poller.Poll(ctx, parallelExecutors, interval)
+err := poller.Poll(ctx, parallelExecutors, interval)
 ```
 
 # Future goals
