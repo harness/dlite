@@ -18,57 +18,38 @@ import (
 	"k8s.io/utils/strings/slices"
 )
 
-type Poller struct {
+var (
+	// Time period between sending heartbeats to the server
+	hearbeatInterval = 10 * time.Second
+)
+
+type poller struct {
 	AccountID     string
 	AccountSecret string
-	Name          string // name of the runner
+	Name          string   // name of the runner
+	Tags          []string // list of tags that the runner accepts
 	Client        client.Client
 	Router        router.Router
 }
 
-func New(accountID, accountSecret, name string, client client.Client, router router.Router) *Poller {
-	return &Poller{
+func New(accountID, accountSecret, name string, tags []string, client client.Client, router router.Router) *poller {
+	return &poller{
 		AccountID:     accountID,
 		AccountSecret: accountSecret,
+		Tags:          tags,
 		Name:          name,
 		Client:        client,
 		Router:        router,
 	}
 }
 
-// Register registers the runner and runs a background thread which keeps pinging the server
-// at a period of interval.
-func (p *Poller) Register(ctx context.Context, tags []string, interval time.Duration) error {
-	host, err := os.Hostname()
-	if err != nil {
-		return errors.Wrap(err, "could not get host name")
-	}
-	req := &client.RegisterRequest{
-		AccountID:          p.AccountID,
-		DelegateName:       p.Name,
-		Token:              p.AccountSecret,
-		ID:                 p.Name,
-		NG:                 true,
-		Type:               "DOCKER",
-		SequenceNum:        1,
-		Polling:            true,
-		HostName:           host,
-		IP:                 p.Name, // TODO: We should change this to actual IP but that was creating issues with restarts
-		SupportedTaskTypes: p.Router.Routes(),
-		Tags:               tags,
-	}
-	err = p.Client.Register(ctx, req)
-	if err != nil {
-		return errors.Wrap(err, "could not register the runner")
-	}
-	logrus.Infof("registered delegate successfully")
-	p.heartbeat(ctx, req, interval)
-	return nil
-}
-
 // Poll continually asks the task server for tasks to execute. It executes the tasks by routing
 // them to the correct handler and updating the status of the task to the server.
-func (p *Poller) Poll(ctx context.Context, n int, interval time.Duration) {
+func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error {
+	err := p.register(ctx, hearbeatInterval)
+	if err != nil {
+		return fmt.Errorf("could not register the delegate: %w", err)
+	}
 	var wg sync.WaitGroup
 	events := make(chan client.TaskEvent, n)
 	// Task event poller
@@ -111,10 +92,11 @@ func (p *Poller) Poll(ctx context.Context, n int, interval time.Duration) {
 	}
 	logrus.Infof("initialized %d threads succesfully and starting polling for tasks", n)
 	wg.Wait()
+	return nil
 }
 
 // execute tries to acquire the task and executes the handler for it
-func (p *Poller) execute(ctx context.Context, ev client.TaskEvent, i int) error {
+func (p *poller) execute(ctx context.Context, ev client.TaskEvent, i int) error {
 	id := ev.TaskID
 	task, err := p.Client.Acquire(ctx, p.Name, id)
 	if err != nil {
@@ -138,10 +120,9 @@ func (p *Poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 	if err != nil {
 		return err
 	}
+
 	writer := NewResponseWriter()
-
 	p.Router.Route(task.Type).ServeHTTP(writer, req)
-
 	taskResponse := &client.TaskResponse{
 		ID:   task.ID,
 		Data: writer.buf.Bytes(),
@@ -156,8 +137,38 @@ func (p *Poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 	return nil
 }
 
+// Register registers the runner and runs a background thread which keeps pinging the server
+// at a period of interval.
+func (p *poller) register(ctx context.Context, interval time.Duration) error {
+	host, err := os.Hostname()
+	if err != nil {
+		return errors.Wrap(err, "could not get host name")
+	}
+	req := &client.RegisterRequest{
+		AccountID:          p.AccountID,
+		DelegateName:       p.Name,
+		Token:              p.AccountSecret,
+		ID:                 p.Name,
+		NG:                 true,
+		Type:               "DOCKER",
+		SequenceNum:        1,
+		Polling:            true,
+		HostName:           host,
+		IP:                 p.Name, // TODO: We should change this to actual IP but that was creating issues with restarts
+		SupportedTaskTypes: p.Router.Routes(),
+		Tags:               p.Tags,
+	}
+	err = p.Client.Register(ctx, req)
+	if err != nil {
+		return errors.Wrap(err, "could not register the runner")
+	}
+	logrus.Infof("registered delegate successfully")
+	p.heartbeat(ctx, req, interval)
+	return nil
+}
+
 // heartbeat starts a periodic thread in the background which continually pings the server
-func (p *Poller) heartbeat(ctx context.Context, req *client.RegisterRequest, interval time.Duration) {
+func (p *poller) heartbeat(ctx context.Context, req *client.RegisterRequest, interval time.Duration) {
 	go func() {
 		msgDelayTimer := time.NewTimer(interval)
 		defer msgDelayTimer.Stop()

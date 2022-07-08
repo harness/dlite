@@ -104,7 +104,7 @@ func (p *HTTPClient) Acquire(ctx context.Context, delegateID, taskID string) (*c
 func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, r *client.TaskResponse) error {
 	path := fmt.Sprintf(taskStatusEndpoint, taskID, delegateID, p.AccountID)
 	req := r
-	_, err := p.do(ctx, path, "POST", req, nil)
+	_, err := p.retry(ctx, path, "POST", req, nil)
 	return err
 }
 
