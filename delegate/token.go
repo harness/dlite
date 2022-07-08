@@ -29,7 +29,6 @@ func Token(audience, issuer, subject, secret string, expiry time.Duration) (stri
 		Subject:  subject,
 		Issuer:   issuer,
 		Audience: []string{audience},
-		// TODO: Add a thread to update the tokens on expiry and keep a smaller expiry time
 		Expiry:   jwt.NewNumericDate(time.Now().Add(expiry)),
 		IssuedAt: jwt.NewNumericDate(time.Now()),
 		ID:       uuid.New().String(),
