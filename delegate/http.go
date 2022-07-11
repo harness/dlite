@@ -25,8 +25,6 @@ const (
 	taskStatusEndpoint  = "/api/agent/v2/tasks/%s/delegates/%s?accountId=%s"
 )
 
-// var _ Client = (*HTTPClient)(nil)
-
 // defaultClient is the default http.Client.
 var defaultClient = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -36,7 +34,9 @@ var defaultClient = &http.Client{
 
 // New returns a new client.
 func New(endpoint, accountID, token string, skipverify bool) *HTTPClient {
+	log := logger.Logrus(nil)
 	client := &HTTPClient{
+		Logger:     log,
 		Endpoint:   endpoint,
 		SkipVerify: skipverify,
 		AccountID:  accountID,
