@@ -110,11 +110,9 @@ func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, 
 	return err
 }
 
-// TODO: Threads get lost in this function
 func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOffContext) (*http.Response, error) {
 	for {
 		res, err := p.do(ctx, path, method, in, out)
-
 		// do not retry on Canceled or DeadlineExceeded
 		if err := ctx.Err(); err != nil {
 			p.logger().Errorf("http: context canceled")
