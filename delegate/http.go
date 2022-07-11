@@ -74,7 +74,7 @@ type HTTPClient struct {
 func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) error {
 	req := r
 	path := fmt.Sprintf(registerEndpoint, p.AccountID)
-	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(30*time.Second))
+	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, 30*time.Second))
 	return err
 }
 
@@ -106,14 +106,12 @@ func (p *HTTPClient) Acquire(ctx context.Context, delegateID, taskID string) (*c
 func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, r *client.TaskResponse) error {
 	path := fmt.Sprintf(taskStatusEndpoint, taskID, delegateID, p.AccountID)
 	req := r
-	fmt.Println("before sending status")
-	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(60*time.Second))
-	fmt.Println("after sending status")
+	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, 60*time.Second))
 	return err
 }
 
 // TODO: Threads get lost in this function
-func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOff) (*http.Response, error) {
+func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOffContext) (*http.Response, error) {
 	for {
 		res, err := p.do(ctx, path, method, in, out)
 
@@ -236,12 +234,12 @@ func (p *HTTPClient) logger() logger.Logger {
 	return p.Logger
 }
 
-func createInfiniteBackoff() *backoff.ExponentialBackOff {
-	return createBackoff(0)
+func createInfiniteBackoff(ctx context.Context) backoff.BackOffContext {
+	return createBackoff(ctx, 0)
 }
 
-func createBackoff(maxElapsedTime time.Duration) *backoff.ExponentialBackOff {
+func createBackoff(ctx context.Context, maxElapsedTime time.Duration) backoff.BackOffContext {
 	exp := backoff.NewExponentialBackOff()
 	exp.MaxElapsedTime = maxElapsedTime
-	return exp
+	return backoff.WithContext(exp, ctx)
 }
