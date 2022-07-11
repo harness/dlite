@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
+	"github.com/sirupsen/logrus"
 	"github.com/wings-software/dlite/client"
 
 	"github.com/wings-software/dlite/logger"
@@ -34,7 +36,7 @@ var defaultClient = &http.Client{
 
 // New returns a new client.
 func New(endpoint, accountID, token string, skipverify bool) *HTTPClient {
-	log := logger.Logrus(nil)
+	log := logrus.New()
 	client := &HTTPClient{
 		Logger:     log,
 		Endpoint:   endpoint,
@@ -72,7 +74,7 @@ type HTTPClient struct {
 func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) error {
 	req := r
 	path := fmt.Sprintf(registerEndpoint, p.AccountID)
-	_, err := p.retry(ctx, path, "POST", req, nil)
+	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(30*time.Second))
 	return err
 }
 
@@ -104,18 +106,24 @@ func (p *HTTPClient) Acquire(ctx context.Context, delegateID, taskID string) (*c
 func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, r *client.TaskResponse) error {
 	path := fmt.Sprintf(taskStatusEndpoint, taskID, delegateID, p.AccountID)
 	req := r
-	_, err := p.retry(ctx, path, "POST", req, nil)
+	fmt.Println("before sending status")
+	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(60*time.Second))
+	fmt.Println("after sending status")
 	return err
 }
 
-func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}) (*http.Response, error) {
+// TODO: Threads get lost in this function
+func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOff) (*http.Response, error) {
 	for {
 		res, err := p.do(ctx, path, method, in, out)
+
 		// do not retry on Canceled or DeadlineExceeded
 		if err := ctx.Err(); err != nil {
-			p.logger().Tracef("http: context canceled")
+			p.logger().Errorf("http: context canceled")
 			return res, err
 		}
+
+		duration := b.NextBackOff()
 
 		if res != nil {
 			// Check the response code. We retry on 500-range
@@ -123,22 +131,19 @@ func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out int
 			// 500's are typically not permanent errors and may
 			// relate to outages on the server side.
 			if res.StatusCode > 501 {
-				p.logger().Tracef("http: server error: re-connect and re-try: %s", err)
-				time.Sleep(time.Second * 10)
-				continue
-			}
-			// We also retry on 204 no content response codes,
-			// used by the server when a long-polling request
-			// is intentionally disconnected and should be
-			// automatically reconnected.
-			if res.StatusCode == 204 {
-				p.logger().Tracef("http: no content returned: re-connect and re-try")
-				time.Sleep(time.Second * 10)
+				p.logger().Errorf("http: server error: re-connect and re-try: %s", err)
+				if duration == backoff.Stop {
+					return nil, err
+				}
+				time.Sleep(duration)
 				continue
 			}
 		} else if err != nil {
-			p.logger().Tracef("http: request error: %s", err)
-			time.Sleep(time.Second * 10)
+			p.logger().Errorf("http: request error: %s", err)
+			if duration == backoff.Stop {
+				return nil, err
+			}
+			time.Sleep(duration)
 			continue
 		}
 		return res, err
@@ -229,4 +234,14 @@ func (p *HTTPClient) logger() logger.Logger {
 		return logger.Discard()
 	}
 	return p.Logger
+}
+
+func createInfiniteBackoff() *backoff.ExponentialBackOff {
+	return createBackoff(0)
+}
+
+func createBackoff(maxElapsedTime time.Duration) *backoff.ExponentialBackOff {
+	exp := backoff.NewExponentialBackOff()
+	exp.MaxElapsedTime = maxElapsedTime
+	return exp
 }

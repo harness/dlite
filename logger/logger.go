@@ -22,9 +22,6 @@ type Logger interface {
 	Warn(args ...interface{})
 	Warnf(format string, args ...interface{})
 	Warnln(args ...interface{})
-
-	WithError(error) Logger
-	WithField(string, interface{}) Logger
 }
 
 // Default returns the default logger.
