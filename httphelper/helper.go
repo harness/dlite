@@ -1,4 +1,4 @@
-package logger
+package httphelper
 
 import (
 	"encoding/json"

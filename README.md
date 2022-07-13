@@ -28,24 +28,24 @@ func (t *DockerInitializeTask) ServeHTTP(w http.ResponseWriter, req *http.Reques
   task := &client.Task{}
   err := json.NewDecoder(r.Body).Decode(task)
   if err != nil {
-    logger.WriteBadRequest(w, err)
+    httphelper.WriteBadRequest(w, err)
     return
   }
   // Unmarshal the task data
   taskBytes, err := task.Data.MarshalJSON()
   if err != nil {
-     logger.WriteBadRequest(w, err)
+     httphelper.WriteBadRequest(w, err)
      return
   }
   d := &DockerInitTaskRequest{}
   err = json.Unmarshal(taskBytes, d)
   if err != nil {
-    logger.WriteBadRequest(w, err)
+    httphelper.WriteBadRequest(w, err)
     return
   }
   // Write the response to writer
   obj := DockerExecutionResponse{}
-  logger.WriteJSON(w, obj, 200)
+  httphelper.WriteJSON(w, obj, 200)
 }
 ```
 
