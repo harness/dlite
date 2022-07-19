@@ -35,14 +35,15 @@ var defaultClient = &http.Client{
 }
 
 // New returns a new client.
-func New(endpoint, accountID, token string, skipverify bool) *HTTPClient {
+func New(endpoint, id, secret string, skipverify bool) *HTTPClient {
 	log := logrus.New()
+	cache := NewTokenCache(id, secret)
 	client := &HTTPClient{
-		Logger:     log,
-		Endpoint:   endpoint,
-		SkipVerify: skipverify,
-		AccountID:  accountID,
-		Token:      token,
+		Logger:            log,
+		Endpoint:          endpoint,
+		SkipVerify:        skipverify,
+		AccountID:         id,
+		AccountTokenCache: cache,
 	}
 	if skipverify {
 		client.Client = &http.Client{
@@ -52,7 +53,7 @@ func New(endpoint, accountID, token string, skipverify bool) *HTTPClient {
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
+					InsecureSkipVerify: skipverify,
 				},
 			},
 		}
@@ -62,12 +63,12 @@ func New(endpoint, accountID, token string, skipverify bool) *HTTPClient {
 
 // An HTTPClient manages communication with the runner API.
 type HTTPClient struct {
-	Client     *http.Client
-	Logger     logger.Logger
-	Endpoint   string
-	Token      string
-	AccountID  string
-	SkipVerify bool
+	Client            *http.Client
+	Logger            logger.Logger
+	Endpoint          string
+	AccountID         string
+	AccountTokenCache *tokenCache
+	SkipVerify        bool
 }
 
 // Register registers the runner with the manager
@@ -154,7 +155,9 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 	// marshal the input payload into json format and copy
 	// to an io.ReadCloser.
 	if in != nil {
-		json.NewEncoder(&buf).Encode(in)
+		if err := json.NewEncoder(&buf).Encode(in); err != nil {
+			p.logger().Errorf("could not encode input payload: %s", err)
+		}
 	}
 
 	endpoint := p.Endpoint + path
@@ -166,7 +169,12 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 
 	// the request should include the secret shared between
 	// the agent and server for authorization.
-	req.Header.Add("Authorization", "Delegate "+p.Token)
+	token, err := p.AccountTokenCache.Get()
+	if err != nil {
+		p.logger().Errorf("could not generate account token: %s", err)
+		return nil, err
+	}
+	req.Header.Add("Authorization", "Delegate "+token)
 	req.Header.Add("Content-Type", "application/json")
 	res, err := p.client().Do(req)
 	if res != nil {
@@ -214,7 +222,7 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 	return res, json.Unmarshal(body, out)
 }
 
-// client is a helper funciton that returns the default client
+// client is a helper function that returns the default client
 // if a custom client is not defined.
 func (p *HTTPClient) client() *http.Client {
 	if p.Client == nil {
@@ -223,17 +231,13 @@ func (p *HTTPClient) client() *http.Client {
 	return p.Client
 }
 
-// logger is a helper funciton that returns the default logger
+// logger is a helper function that returns the default logger
 // if a custom logger is not defined.
 func (p *HTTPClient) logger() logger.Logger {
 	if p.Logger == nil {
 		return logger.Discard()
 	}
 	return p.Logger
-}
-
-func createInfiniteBackoff(ctx context.Context) backoff.BackOffContext {
-	return createBackoff(ctx, 0)
 }
 
 func createBackoff(ctx context.Context, maxElapsedTime time.Duration) backoff.BackOffContext {

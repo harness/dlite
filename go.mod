@@ -15,6 +15,7 @@ require (
 require (
 	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
+	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	golang.org/x/crypto v0.0.0-20190621222207-cc06ce4a13d4 // indirect
 	golang.org/x/sys v0.0.0-20190422165155-953cdadca894 // indirect
 )

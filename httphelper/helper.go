@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // unix epoch time
@@ -15,13 +17,6 @@ var noCacheHeaders = map[string]string{
 	"Cache-Control":   "no-cache, private, max-age=0",
 	"Pragma":          "no-cache",
 	"X-Accel-Expires": "0",
-}
-
-// helper function to prevent http response caching.
-func nocache(w http.ResponseWriter) {
-	for k, v := range noCacheHeaders {
-		w.Header().Set(k, v)
-	}
 }
 
 // writeBadRequest writes the json-encoded error message
@@ -52,7 +47,9 @@ func WriteJSON(w http.ResponseWriter, v interface{}, status int) {
 	w.WriteHeader(status)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	enc.Encode(v)
+	if err := enc.Encode(v); err != nil {
+		logrus.New().WithError(err).Error("could not encode JSON")
+	}
 }
 
 // writeError writes the json-encoded error message to the
