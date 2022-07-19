@@ -90,7 +90,7 @@ func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error 
 			}
 		}(i)
 	}
-	logrus.Infof("initialized %d threads succesfully and starting polling for tasks", n)
+	logrus.Infof("initialized %d threads successfully and starting polling for tasks", n)
 	wg.Wait()
 	return nil
 }
