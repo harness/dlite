@@ -57,14 +57,11 @@ router := router.NewRouter(router.RouteMap)
 
 Create a client and start polling for tasks:
 ```
-// Generate a token
-token := delegate.Token(...)
-
 // Create a delegate client
 client := delegate.Client(...)
 
 // The poller needs a client that interacts with the task management system and a router to route the tasks
-poller := poller.New(id, secret, name, client, router)
+poller := poller.New(...)
 
 // Start polling for tasks
 err := poller.Poll(ctx, parallelExecutors, interval)
