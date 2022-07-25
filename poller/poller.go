@@ -48,7 +48,7 @@ func New(accountID, accountSecret, name string, tags []string, client client.Cli
 func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error {
 	err := p.register(ctx, hearbeatInterval)
 	if err != nil {
-		return fmt.Errorf("could not register the delegate: %w", err)
+		return errors.Wrap(err, "could not register the delegate")
 	}
 	var wg sync.WaitGroup
 	events := make(chan client.TaskEvent, n)
@@ -64,7 +64,7 @@ func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error 
 			case <-pollTimer.C:
 				tasks, err := p.Client.GetTaskEvents(ctx, p.Name)
 				if err != nil {
-					logrus.Errorf("could not query for task events")
+					logrus.WithError(err).Errorf("could not query for task events")
 				}
 				if len(tasks.TaskEvents) > 0 {
 					events <- tasks.TaskEvents[0]
@@ -84,7 +84,7 @@ func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error 
 				case task := <-events:
 					err := p.execute(ctx, task, i)
 					if err != nil {
-						logrus.Errorf("[Thread %d]: could not dispatch task with error: %s", i, err)
+						logrus.WithError(err).Errorf("[Thread %d]: could not dispatch task", i)
 					}
 				}
 			}
@@ -100,12 +100,12 @@ func (p *poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 	id := ev.TaskID
 	task, err := p.Client.Acquire(ctx, p.Name, id)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to acquire the task")
 	}
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(task)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to encode task")
 	}
 	logrus.Infof("[Thread %d]: successfully acquired taskID: %s of type: %s", i, id, task.Type)
 	if !slices.Contains(p.Router.Routes(), task.Type) { // should not happen
@@ -131,7 +131,7 @@ func (p *poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 	}
 	err = p.Client.SendStatus(ctx, p.Name, id, taskResponse)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to send step status")
 	}
 	logrus.Infof("[Thread %d]: successfully completed task execution of taskID: %s of type: %s", i, id, task.Type)
 	return nil
@@ -181,7 +181,7 @@ func (p *poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 			case <-msgDelayTimer.C:
 				err := p.Client.Heartbeat(ctx, req)
 				if err != nil {
-					logrus.Errorf("could not send heartbeat with error: %s", err)
+					logrus.WithError(err).Errorf("could not send heartbeat")
 				}
 			}
 		}
