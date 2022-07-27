@@ -53,7 +53,6 @@ func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error 
 	if err != nil {
 		return errors.Wrap(err, "could not register the delegate")
 	}
-	logrus.WithField("id", id).Info("registered delegate successfully")
 	var wg sync.WaitGroup
 	events := make(chan client.TaskEvent, n)
 	// Task event poller
@@ -149,7 +148,6 @@ func (p *poller) register(ctx context.Context, interval time.Duration) (string, 
 		return "", errors.Wrap(err, "could not get host name")
 	}
 	host = "dlite-" + strings.ReplaceAll(host, " ", "-")
-	fmt.Println("host: ", host)
 	req := &client.RegisterRequest{
 		AccountID:          p.AccountID,
 		DelegateName:       p.Name,
@@ -167,8 +165,10 @@ func (p *poller) register(ctx context.Context, interval time.Duration) (string, 
 	if err != nil {
 		return "", errors.Wrap(err, "could not register the runner")
 	}
+	req.ID = resp.Resource.DelegateID
+	logrus.WithField("id", req.ID).WithField("host", req.HostName).WithField("ip", req.IP).Info("registered delegate successfully")
 	p.heartbeat(ctx, req, interval)
-	return resp.DelegateID, nil
+	return resp.Resource.DelegateID, nil
 }
 
 // heartbeat starts a periodic thread in the background which continually pings the server
@@ -192,12 +192,12 @@ func (p *poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 	}()
 }
 
-// Get preferred outbound ip of this machine. If
+// Get preferred outbound ip of this machine. It returns a fake IP in case of errors.
 func getOutboundIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		logrus.WithError(err).Error("could not figure out an IP, using a randomly generated IP")
-		return fake.IPv4()
+		return "fake-" + fake.IPv4()
 	}
 	defer conn.Close()
 
