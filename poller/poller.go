@@ -112,7 +112,7 @@ func (p *poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 					wg.Done()
 					return
 				case task := <-events:
-					err := p.execute(ctx, task, i)
+					err := p.execute(ctx, id, task, i)
 					if err != nil {
 						logrus.WithError(err).Errorf("[Thread %d]: could not dispatch task", i)
 					}
@@ -126,9 +126,9 @@ func (p *poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 }
 
 // execute tries to acquire the task and executes the handler for it
-func (p *poller) execute(ctx context.Context, ev client.TaskEvent, i int) error {
-	id := ev.TaskID
-	task, err := p.Client.Acquire(ctx, p.Name, id)
+func (p *poller) execute(ctx context.Context, delegateID string, ev client.TaskEvent, i int) error {
+	taskID := ev.TaskID
+	task, err := p.Client.Acquire(ctx, delegateID, taskID)
 	if err != nil {
 		return errors.Wrap(err, "failed to acquire the task")
 	}
@@ -137,7 +137,7 @@ func (p *poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 	if err != nil {
 		return errors.Wrap(err, "failed to encode task")
 	}
-	logrus.Infof("[Thread %d]: successfully acquired taskID: %s of type: %s", i, id, task.Type)
+	logrus.Infof("[Thread %d]: successfully acquired taskID: %s of type: %s", i, taskID, task.Type)
 	if !slices.Contains(p.Router.Routes(), task.Type) { // should not happen
 		logrus.Errorf("[Thread %d]: Task ID of type: %s was never meant to reach this delegate", i, task.Type)
 		return fmt.Errorf("task type not supported by delegate")
@@ -159,11 +159,11 @@ func (p *poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 		Code: "OK",
 		Type: task.Type,
 	}
-	err = p.Client.SendStatus(ctx, p.Name, id, taskResponse)
+	err = p.Client.SendStatus(ctx, delegateID, taskID, taskResponse)
 	if err != nil {
 		return errors.Wrap(err, "failed to send step status")
 	}
-	logrus.Infof("[Thread %d]: successfully completed task execution of taskID: %s of type: %s", i, id, task.Type)
+	logrus.Infof("[Thread %d]: successfully completed task execution of taskID: %s of type: %s", i, taskID, task.Type)
 	return nil
 }
 
@@ -179,7 +179,7 @@ func (p *poller) register(ctx context.Context, interval time.Duration, ip, host 
 		SequenceNum:        1,
 		Polling:            true,
 		HostName:           host,
-		IP:                 ip, // TODO: We should change this to actual IP but that was creating issues with restarts
+		IP:                 ip,
 		SupportedTaskTypes: p.Router.Routes(),
 		Tags:               p.Tags,
 	}
