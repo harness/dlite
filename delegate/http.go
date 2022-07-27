@@ -72,11 +72,12 @@ type HTTPClient struct {
 }
 
 // Register registers the runner with the manager
-func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) error {
+func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) (*client.RegisterResponse, error) {
 	req := r
+	resp := &client.RegisterResponse{}
 	path := fmt.Sprintf(registerEndpoint, p.AccountID)
-	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, 30*time.Second))
-	return err
+	_, err := p.retry(ctx, path, "POST", req, resp, createBackoff(ctx, 30*time.Second))
+	return resp, err
 }
 
 // Heartbeat sends a periodic heartbeat to the server

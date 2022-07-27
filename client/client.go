@@ -9,20 +9,29 @@ import (
 type (
 	// Taken from existing manager API
 	RegisterRequest struct {
-		AccountID          string   `json:"accountId"`
-		DelegateName       string   `json:"delegateName"`
-		Token              string   `json:"delegateRandomToken"`
-		ID                 string   `json:"delegateId"`
-		Type               string   `json:"delegateType"`
-		NG                 bool     `json:"ng"`
-		Polling            bool     `json:"pollingModeEnabled"`
-		HostName           string   `json:"hostName"`
-		Connected          bool     `json:"connected"`
-		KeepAlivePacket    bool     `json:"keepAlivePacket"`
-		SequenceNum        int      `json:"sequenceNum"`
-		IP                 string   `json:"ip"`
-		SupportedTaskTypes []string `json:"supportedTaskTypes"`
-		Tags               []string `json:"tags"`
+		AccountID          string   `json:"accountId,omitempty"`
+		DelegateName       string   `json:"delegateName,omitempty"`
+		Token              string   `json:"delegateRandomToken,omitempty"`
+		ID                 string   `json:"delegateId,omitempty"`
+		Type               string   `json:"delegateType,omitempty"`
+		NG                 bool     `json:"ng,omitempty"`
+		Polling            bool     `json:"pollingModeEnabled,omitempty"`
+		HostName           string   `json:"hostName,omitempty"`
+		Connected          bool     `json:"connected,omitempty"`
+		KeepAlivePacket    bool     `json:"keepAlivePacket,omitempty"`
+		SequenceNum        int      `json:"sequenceNum,omitempty"`
+		IP                 string   `json:"ip,omitempty"`
+		SupportedTaskTypes []string `json:"supportedTaskTypes,omitempty"`
+		Tags               []string `json:"tags,omitempty"`
+	}
+
+	// Used in the java codebase :'(
+	RegisterResponse struct {
+		Resource RegistrationData `json:"resource"`
+	}
+
+	RegistrationData struct {
+		DelegateID string `json:"delegateId"`
 	}
 
 	TaskEventsResponse struct {
@@ -68,7 +77,7 @@ type (
 // Client is an interface which defines methods on interacting with a task managing system.
 type Client interface {
 	// Register registers the runner with the task server
-	Register(ctx context.Context, r *RegisterRequest) error
+	Register(ctx context.Context, r *RegisterRequest) (*RegisterResponse, error)
 
 	// Heartbeat pings the task server to let it know that the runner is still alive
 	Heartbeat(ctx context.Context, r *RegisterRequest) error

@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/icrowley/fake"
 	"github.com/wings-software/dlite/client"
 	"github.com/wings-software/dlite/router"
 
@@ -46,7 +49,7 @@ func New(accountID, accountSecret, name string, tags []string, client client.Cli
 // Poll continually asks the task server for tasks to execute. It executes the tasks by routing
 // them to the correct handler and updating the status of the task to the server.
 func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error {
-	err := p.register(ctx, hearbeatInterval)
+	id, err := p.register(ctx, hearbeatInterval)
 	if err != nil {
 		return errors.Wrap(err, "could not register the delegate")
 	}
@@ -62,7 +65,7 @@ func (p *poller) Poll(ctx context.Context, n int, interval time.Duration) error 
 				logrus.Error("context canceled")
 				return
 			case <-pollTimer.C:
-				tasks, err := p.Client.GetTaskEvents(ctx, p.Name)
+				tasks, err := p.Client.GetTaskEvents(ctx, id)
 				if err != nil {
 					logrus.WithError(err).Errorf("could not query for task events")
 				}
@@ -138,33 +141,34 @@ func (p *poller) execute(ctx context.Context, ev client.TaskEvent, i int) error 
 }
 
 // Register registers the runner and runs a background thread which keeps pinging the server
-// at a period of interval.
-func (p *poller) register(ctx context.Context, interval time.Duration) error {
+// at a period of interval. It returns the delegate ID.
+func (p *poller) register(ctx context.Context, interval time.Duration) (string, error) {
 	host, err := os.Hostname()
 	if err != nil {
-		return errors.Wrap(err, "could not get host name")
+		return "", errors.Wrap(err, "could not get host name")
 	}
+	host = "dlite-" + strings.ReplaceAll(host, " ", "-")
 	req := &client.RegisterRequest{
 		AccountID:          p.AccountID,
 		DelegateName:       p.Name,
 		Token:              p.AccountSecret,
-		ID:                 p.Name,
 		NG:                 true,
 		Type:               "DOCKER",
 		SequenceNum:        1,
 		Polling:            true,
 		HostName:           host,
-		IP:                 p.Name, // TODO: We should change this to actual IP but that was creating issues with restarts
+		IP:                 getOutboundIP(), // TODO: We should change this to actual IP but that was creating issues with restarts
 		SupportedTaskTypes: p.Router.Routes(),
 		Tags:               p.Tags,
 	}
-	err = p.Client.Register(ctx, req)
+	resp, err := p.Client.Register(ctx, req)
 	if err != nil {
-		return errors.Wrap(err, "could not register the runner")
+		return "", errors.Wrap(err, "could not register the runner")
 	}
-	logrus.Infof("registered delegate successfully")
+	req.ID = resp.Resource.DelegateID
+	logrus.WithField("id", req.ID).WithField("host", req.HostName).WithField("ip", req.IP).Info("registered delegate successfully")
 	p.heartbeat(ctx, req, interval)
-	return nil
+	return resp.Resource.DelegateID, nil
 }
 
 // heartbeat starts a periodic thread in the background which continually pings the server
@@ -186,4 +190,17 @@ func (p *poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 			}
 		}
 	}()
+}
+
+// Get preferred outbound ip of this machine. It returns a fake IP in case of errors.
+func getOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		logrus.WithError(err).Error("could not figure out an IP, using a randomly generated IP")
+		return "fake-" + fake.IPv4()
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
 }
