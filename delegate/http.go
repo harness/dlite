@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -27,6 +26,11 @@ const (
 	taskStatusEndpoint  = "/api/agent/v2/tasks/%s/delegates/%s?accountId=%s"
 )
 
+var (
+	registerTimeout   = 30 * time.Second
+	taskEventsTimeout = 60 * time.Second
+)
+
 // defaultClient is the default http.Client.
 var defaultClient = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -38,27 +42,28 @@ var defaultClient = &http.Client{
 func New(endpoint, id, secret string, skipverify bool) *HTTPClient {
 	log := logrus.New()
 	cache := NewTokenCache(id, secret)
-	client := &HTTPClient{
+	c := &HTTPClient{
 		Logger:            log,
 		Endpoint:          endpoint,
 		SkipVerify:        skipverify,
 		AccountID:         id,
+		Client:            defaultClient,
 		AccountTokenCache: cache,
 	}
 	if skipverify {
-		client.Client = &http.Client{
+		c.Client = &http.Client{
 			CheckRedirect: func(*http.Request, []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: skipverify,
+					InsecureSkipVerify: skipverify, //nolint:gosec
 				},
 			},
 		}
 	}
-	return client
+	return c
 }
 
 // An HTTPClient manages communication with the runner API.
@@ -67,7 +72,7 @@ type HTTPClient struct {
 	Logger            logger.Logger
 	Endpoint          string
 	AccountID         string
-	AccountTokenCache *tokenCache
+	AccountTokenCache *TokenCache
 	SkipVerify        bool
 }
 
@@ -76,7 +81,7 @@ func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) (*
 	req := r
 	resp := &client.RegisterResponse{}
 	path := fmt.Sprintf(registerEndpoint, p.AccountID)
-	_, err := p.retry(ctx, path, "POST", req, resp, createBackoff(ctx, 30*time.Second))
+	_, err := p.retry(ctx, path, "POST", req, resp, createBackoff(ctx, registerTimeout))
 	return resp, err
 }
 
@@ -108,7 +113,7 @@ func (p *HTTPClient) Acquire(ctx context.Context, delegateID, taskID string) (*c
 func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, r *client.TaskResponse) error {
 	path := fmt.Sprintf(taskStatusEndpoint, taskID, delegateID, p.AccountID)
 	req := r
-	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, 60*time.Second))
+	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout))
 	return err
 }
 
@@ -116,9 +121,9 @@ func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out int
 	for {
 		res, err := p.do(ctx, path, method, in, out)
 		// do not retry on Canceled or DeadlineExceeded
-		if err := ctx.Err(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
 			p.logger().Errorf("http: context canceled")
-			return res, err
+			return res, ctxErr
 		}
 
 		duration := b.NextBackOff()
@@ -177,12 +182,14 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 	}
 	req.Header.Add("Authorization", "Delegate "+token)
 	req.Header.Add("Content-Type", "application/json")
-	res, err := p.client().Do(req)
+	res, err := p.Client.Do(req)
 	if res != nil {
 		defer func() {
 			// drain the response body so we can reuse
 			// this connection.
-			io.Copy(ioutil.Discard, io.LimitReader(res.Body, 4096))
+			if _, err = io.Copy(io.Discard, io.LimitReader(res.Body, 4096)); err != nil {
+				p.logger().Errorf("could not drain response body: %s", err)
+			}
 			res.Body.Close()
 		}()
 	}
@@ -198,7 +205,7 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 	}
 
 	// else read the response body into a byte slice.
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return res, err
 	}
@@ -221,15 +228,6 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 		return res, nil
 	}
 	return res, json.Unmarshal(body, out)
-}
-
-// client is a helper function that returns the default client
-// if a custom client is not defined.
-func (p *HTTPClient) client() *http.Client {
-	if p.Client == nil {
-		return defaultClient
-	}
-	return p.Client
 }
 
 // logger is a helper function that returns the default logger
