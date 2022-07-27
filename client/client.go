@@ -25,6 +25,10 @@ type (
 		Tags               []string `json:"tags"`
 	}
 
+	RegisterResponse struct {
+		DelegateID string `json:"delegateId"`
+	}
+
 	TaskEventsResponse struct {
 		TaskEvents []TaskEvent `json:"delegateTaskEvents"`
 	}
@@ -68,7 +72,7 @@ type (
 // Client is an interface which defines methods on interacting with a task managing system.
 type Client interface {
 	// Register registers the runner with the task server
-	Register(ctx context.Context, r *RegisterRequest) error
+	Register(ctx context.Context, r *RegisterRequest) (*RegisterResponse, error)
 
 	// Heartbeat pings the task server to let it know that the runner is still alive
 	Heartbeat(ctx context.Context, r *RegisterRequest) error
