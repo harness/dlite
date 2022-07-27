@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/icrowley/fake"
 	"github.com/wings-software/dlite/client"
 	"github.com/wings-software/dlite/router"
 
@@ -147,7 +148,7 @@ func (p *poller) register(ctx context.Context, interval time.Duration) (string, 
 	if err != nil {
 		return "", errors.Wrap(err, "could not get host name")
 	}
-	host = "lite-" + strings.ReplaceAll(host, " ", "-")
+	host = "dlite-" + strings.ReplaceAll(host, " ", "-")
 	fmt.Println("host: ", host)
 	req := &client.RegisterRequest{
 		AccountID:          p.AccountID,
@@ -158,7 +159,7 @@ func (p *poller) register(ctx context.Context, interval time.Duration) (string, 
 		SequenceNum:        1,
 		Polling:            true,
 		HostName:           host,
-		IP:                 getIP(), // TODO: We should change this to actual IP but that was creating issues with restarts
+		IP:                 getOutboundIP(), // TODO: We should change this to actual IP but that was creating issues with restarts
 		SupportedTaskTypes: p.Router.Routes(),
 		Tags:               p.Tags,
 	}
@@ -191,36 +192,15 @@ func (p *poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 	}()
 }
 
-// this function behaves similarly to how the java delegate assigns IP.
-// TODO: see if this can be simplified
-func getIP() string {
-	ifaces, err := net.Interfaces()
+// Get preferred outbound ip of this machine. If
+func getOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		fmt.Println("error: ", err)
-		return "localhost"
+		logrus.WithError(err).Error("could not figure out an IP, using a randomly generated IP")
+		return fake.IPv4()
 	}
-	// handle err
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			fmt.Println("error: ", err)
-		}
-		// handle err
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-				fmt.Printf("IPNET Addr ip: %+v", ip)
-			case *net.IPAddr:
-				ip = v.IP
-				fmt.Printf("IPADdr ip: %+v", ip)
-			default:
-				fmt.Printf("v is: %+v", v)
-			}
-			// process IP address
-			return ip.String()
-		}
-	}
-	return ""
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
 }
