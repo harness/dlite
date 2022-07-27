@@ -83,11 +83,11 @@ type Client interface {
 	Heartbeat(ctx context.Context, r *RegisterRequest) error
 
 	// GetTaskEvents gets a list of pending tasks that need to be executed for this runner
-	GetTaskEvents(ctx context.Context, name string) (*TaskEventsResponse, error)
+	GetTaskEvents(ctx context.Context, delegateID string) (*TaskEventsResponse, error)
 
 	// Acquire tells the task server that the runner is ready to execute a task ID
-	Acquire(ctx context.Context, name, taskID string) (*Task, error)
+	Acquire(ctx context.Context, delegateID, taskID string) (*Task, error)
 
 	// SendStatus sends a response to the task server for a task ID
-	SendStatus(ctx context.Context, name, taskID string, req *TaskResponse) error
+	SendStatus(ctx context.Context, delegateID, taskID string, req *TaskResponse) error
 }
