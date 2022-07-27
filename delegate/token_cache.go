@@ -13,7 +13,7 @@ var (
 	expirationTime = 10 * time.Minute // token gets refreshed every 10 minutes
 )
 
-type tokenCache struct {
+type TokenCache struct {
 	id     string
 	secret string
 	expiry time.Duration
@@ -22,9 +22,9 @@ type tokenCache struct {
 
 // NewTokenCache creates a token cache which creates a new token
 // after the expiry time is over
-func NewTokenCache(id, secret string) *tokenCache {
+func NewTokenCache(id, secret string) *TokenCache {
 	c := cache.New(cache.DefaultExpiration, expirationTime)
-	return &tokenCache{
+	return &TokenCache{
 		id:     id,
 		secret: secret,
 		expiry: expirationTime,
@@ -35,7 +35,7 @@ func NewTokenCache(id, secret string) *tokenCache {
 // Get returns the value of the account token.
 // If the token is cached, it returns from there. Otherwise
 // it creates a new token with a new expiration time.
-func (t *tokenCache) Get() (string, error) {
+func (t *TokenCache) Get() (string, error) {
 	tv, found := t.c.Get(t.id)
 	if found {
 		return tv.(string), nil

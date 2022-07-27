@@ -18,7 +18,7 @@ type router struct {
 }
 
 // NewRouter returns a new instance of a router
-func NewRouter(routes map[string]task.Handler) *router {
+func NewRouter(routes map[string]task.Handler) *router { //nolint:revive
 	return &router{routes: routes}
 }
 

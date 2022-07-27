@@ -24,6 +24,6 @@ func (r *response) Write(p []byte) (n int, err error) {
 	return r.buf.Write(p)
 }
 
-func NewResponseWriter() *response {
+func NewResponseWriter() *response { //nolint:revive
 	return &response{header: map[string][]string{}, buf: bytes.Buffer{}}
 }
