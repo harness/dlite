@@ -63,8 +63,11 @@ client := delegate.Client(...)
 // The poller needs a client that interacts with the task management system and a router to route the tasks
 poller := poller.New(...)
 
+// Register the poller
+info, err := poller.Register(...)
+
 // Start polling for tasks
-err := poller.Poll(ctx, parallelExecutors, interval)
+err := poller.Poll(ctx, parallelExecutors, info.ID, ... ,interval)
 ```
 
 # Future goals
