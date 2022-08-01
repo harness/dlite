@@ -31,9 +31,13 @@ type Poller struct {
 	AccountSecret string
 	Name          string   // name of the runner
 	Tags          []string // list of tags that the runner accepts
-	ID            string   // this is populated only after the registration request
 	Client        client.Client
 	Router        router.Router
+	// The Harness manager allows two task acquire calls with the same delegate ID to go through (by design).
+	// We need to make sure two different threads do not acquire the same task.
+	// This map makes sure Acquire() is called only once per task ID. It's written and read by only
+	// the task event poller thread.
+	m map[string]bool
 }
 
 type DelegateInfo struct {
@@ -51,6 +55,7 @@ func New(accountID, accountSecret, name string, tags []string, c client.Client, 
 		Name:          name,
 		Client:        c,
 		Router:        r,
+		m:             make(map[string]bool),
 	}
 }
 
@@ -97,7 +102,12 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 					logrus.WithError(err).Errorf("could not query for task events")
 				}
 				if len(tasks.TaskEvents) > 0 {
-					events <- tasks.TaskEvents[0]
+					taskID := tasks.TaskEvents[0].TaskID
+					if _, ok := p.m[taskID]; !ok {
+						p.m[taskID] = true
+						events <- tasks.TaskEvents[0]
+						delete(p.m, taskID)
+					}
 				}
 			}
 		}
