@@ -35,9 +35,9 @@ type Poller struct {
 	Router        router.Router
 	// The Harness manager allows two task acquire calls with the same delegate ID to go through (by design).
 	// We need to make sure two different threads do not acquire the same task.
-	// This map makes sure Acquire() is called only once per task ID. It's written and read by only
-	// the task event poller thread.
-	m map[string]bool
+	// This map makes sure Acquire() is called only once per task ID. The mapping is removed once the status
+	// for the task has been sent.
+	m sync.Map
 }
 
 type DelegateInfo struct {
@@ -55,7 +55,7 @@ func New(accountID, accountSecret, name string, tags []string, c client.Client, 
 		Name:          name,
 		Client:        c,
 		Router:        r,
-		m:             make(map[string]bool),
+		m:             sync.Map{},
 	}
 }
 
@@ -102,12 +102,7 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 					logrus.WithError(err).Errorf("could not query for task events")
 				}
 				if len(tasks.TaskEvents) > 0 {
-					taskID := tasks.TaskEvents[0].TaskID
-					if _, ok := p.m[taskID]; !ok {
-						p.m[taskID] = true
-						events <- tasks.TaskEvents[0]
-						delete(p.m, taskID)
-					}
+					events <- tasks.TaskEvents[0]
 				}
 			}
 		}
@@ -124,7 +119,7 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 				case task := <-events:
 					err := p.execute(ctx, id, task, i)
 					if err != nil {
-						logrus.WithError(err).Errorf("[Thread %d]: could not dispatch task", i)
+						logrus.WithError(err).WithField("task_id", task.TaskID).Errorf("[Thread %d]: could not perform task execution", i)
 					}
 				}
 			}
@@ -138,9 +133,13 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 // execute tries to acquire the task and executes the handler for it
 func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskEvent, i int) error {
 	taskID := ev.TaskID
+	if _, loaded := p.m.LoadOrStore(taskID, true); loaded {
+		return nil
+	}
+	defer p.m.Delete(taskID)
 	task, err := p.Client.Acquire(ctx, delegateID, taskID)
 	if err != nil {
-		return errors.Wrap(err, "failed to acquire the task")
+		return errors.Wrap(err, "failed to acquire task")
 	}
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(task)
@@ -198,7 +197,8 @@ func (p *Poller) register(ctx context.Context, interval time.Duration, ip, host 
 		return "", errors.Wrap(err, "could not register the runner")
 	}
 	req.ID = resp.Resource.DelegateID
-	logrus.WithField("id", req.ID).WithField("host", req.HostName).WithField("ip", req.IP).Info("registered delegate successfully")
+	logrus.WithField("id", req.ID).WithField("host", req.HostName).
+		WithField("ip", req.IP).Info("registered delegate successfully")
 	p.heartbeat(ctx, req, interval)
 	return resp.Resource.DelegateID, nil
 }
