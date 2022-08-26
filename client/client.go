@@ -35,13 +35,14 @@ type (
 	}
 
 	TaskEventsResponse struct {
-		TaskEvents []TaskEvent `json:"delegateTaskEvents"`
+		TaskEvents []*TaskEvent `json:"delegateTaskEvents"`
 	}
 
 	TaskEvent struct {
 		AccountID string `json:"accountId"`
 		TaskID    string `json:"delegateTaskId"`
 		Sync      bool   `json:"sync"`
+		TaskType  string `json:"taskType"`
 	}
 
 	Task struct {
