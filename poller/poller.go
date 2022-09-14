@@ -111,8 +111,8 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 				// Search for a task event matching the filter
 				for _, ev := range tasks.TaskEvents {
 					if p.Filter == nil || p.Filter(ev) {
+						logrus.WithField("task_id", ev.TaskID).Info("trying to acquire task")
 						events <- ev
-						break
 					}
 				}
 			}
