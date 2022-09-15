@@ -81,7 +81,7 @@ func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) (*
 	req := r
 	resp := &client.RegisterResponse{}
 	path := fmt.Sprintf(registerEndpoint, p.AccountID)
-	_, err := p.retry(ctx, path, "POST", req, resp, createBackoff(ctx, registerTimeout))
+	_, err := p.retry(ctx, path, "POST", req, resp, createBackoff(ctx, registerTimeout), true) //nolint: bodyclose
 	return resp, err
 }
 
@@ -113,11 +113,11 @@ func (p *HTTPClient) Acquire(ctx context.Context, delegateID, taskID string) (*c
 func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, r *client.TaskResponse) error {
 	path := fmt.Sprintf(taskStatusEndpoint, taskID, delegateID, p.AccountID)
 	req := r
-	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout))
+	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true) //nolint: bodyclose
 	return err
 }
 
-func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOffContext) (*http.Response, error) {
+func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOffContext, ignoreStatusCode bool) (*http.Response, error) { //nolint: unparam
 	for {
 		res, err := p.do(ctx, path, method, in, out)
 		// do not retry on Canceled or DeadlineExceeded
@@ -133,7 +133,7 @@ func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out int
 			// responses to allow the server time to recover, as
 			// 500's are typically not permanent errors and may
 			// relate to outages on the server side.
-			if res.StatusCode > 501 {
+			if (ignoreStatusCode && err != nil) || res.StatusCode > 501 {
 				p.logger().Errorf("http: server error: re-connect and re-try: %s", err)
 				if duration == backoff.Stop {
 					return nil, err
