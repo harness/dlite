@@ -10,7 +10,7 @@ import (
 var (
 	audience       = "audience"
 	issuer         = "issuer"
-	expirationTime = 10 * time.Minute // token gets refreshed every 10 minutes
+	expirationTime = 20 * time.Minute
 )
 
 type TokenCache struct {
@@ -23,7 +23,8 @@ type TokenCache struct {
 // NewTokenCache creates a token cache which creates a new token
 // after the expiry time is over
 func NewTokenCache(id, secret string) *TokenCache {
-	c := cache.New(cache.DefaultExpiration, expirationTime)
+	// purge expired tokens from the cache at expirationTime/3 intervals
+	c := cache.New(cache.DefaultExpiration, expirationTime/3)
 	return &TokenCache{
 		id:     id,
 		secret: secret,
@@ -45,6 +46,7 @@ func (t *TokenCache) Get() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	t.c.Set(t.id, token, t.expiry)
+	// refresh token before the expiration time to give some buffer
+	t.c.Set(t.id, token, t.expiry/2)
 	return token, nil
 }
