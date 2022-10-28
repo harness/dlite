@@ -12,6 +12,7 @@ type (
 		AccountID          string   `json:"accountId,omitempty"`
 		DelegateName       string   `json:"delegateName,omitempty"`
 		Token              string   `json:"delegateRandomToken,omitempty"`
+		LastHeartbeat      int64    `json:"lastHeartBeat,omitempty"`
 		ID                 string   `json:"delegateId,omitempty"`
 		Type               string   `json:"delegateType,omitempty"`
 		NG                 bool     `json:"ng,omitempty"`
@@ -23,6 +24,7 @@ type (
 		IP                 string   `json:"ip,omitempty"`
 		SupportedTaskTypes []string `json:"supportedTaskTypes,omitempty"`
 		Tags               []string `json:"tags,omitempty"`
+		HeartbeatAsObject  bool     `json:"heartbeatAsObject,omitempty"`
 	}
 
 	// Used in the java codebase :'(

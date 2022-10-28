@@ -193,6 +193,7 @@ func (p *Poller) register(ctx context.Context, interval time.Duration, ip, host 
 	req := &client.RegisterRequest{
 		AccountID:          p.AccountID,
 		DelegateName:       p.Name,
+		LastHeartbeat:      time.Now().UnixMilli(),
 		Token:              p.AccountSecret,
 		NG:                 true,
 		Type:               "DOCKER",
@@ -202,6 +203,7 @@ func (p *Poller) register(ctx context.Context, interval time.Duration, ip, host 
 		IP:                 ip,
 		SupportedTaskTypes: p.Router.Routes(),
 		Tags:               p.Tags,
+		HeartbeatAsObject:  true,
 	}
 	resp, err := p.Client.Register(ctx, req)
 	if err != nil {
@@ -226,6 +228,7 @@ func (p *Poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 				logrus.Error("context canceled")
 				return
 			case <-msgDelayTimer.C:
+				req.LastHeartbeat = time.Now().UnixMilli()
 				err := p.Client.Heartbeat(ctx, req)
 				if err != nil {
 					logrus.WithError(err).Errorf("could not send heartbeat")
