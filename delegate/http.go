@@ -24,6 +24,7 @@ const (
 	taskPollEndpoint    = "/api/agent/delegates/%s/task-events?accountId=%s"
 	taskAcquireEndpoint = "/api/agent/v2/delegates/%s/tasks/%s/acquire?accountId=%s&delegateInstanceId=%s"
 	taskStatusEndpoint  = "/api/agent/v2/tasks/%s/delegates/%s?accountId=%s"
+	delegateCapEndpoint = "/api/agent/delegates/register-delegate-capacity/%s?accountId=%s"
 )
 
 var (
@@ -89,6 +90,14 @@ func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) (*
 func (p *HTTPClient) Heartbeat(ctx context.Context, r *client.RegisterRequest) error {
 	req := r
 	path := fmt.Sprintf(heartbeatEndpoint, p.AccountID)
+	_, err := p.do(ctx, path, "POST", req, nil)
+	return err
+}
+
+// Heartbeat sends a periodic heartbeat to the server
+func (p *HTTPClient) RegisterCapacity(ctx context.Context, delId string, r *client.DelegateCapacity) error {
+	req := r
+	path := fmt.Sprintf(delegateCapEndpoint, delId, p.AccountID)
 	_, err := p.do(ctx, path, "POST", req, nil)
 	return err
 }
