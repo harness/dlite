@@ -95,9 +95,9 @@ func (p *HTTPClient) Heartbeat(ctx context.Context, r *client.RegisterRequest) e
 }
 
 // Heartbeat sends a periodic heartbeat to the server
-func (p *HTTPClient) RegisterCapacity(ctx context.Context, delId string, r *client.DelegateCapacity) error {
+func (p *HTTPClient) RegisterCapacity(ctx context.Context, delID string, r *client.DelegateCapacity) error {
 	req := r
-	path := fmt.Sprintf(delegateCapEndpoint, delId, p.AccountID)
+	path := fmt.Sprintf(delegateCapEndpoint, delID, p.AccountID)
 	_, err := p.do(ctx, path, "POST", req, nil)
 	return err
 }
