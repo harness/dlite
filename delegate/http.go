@@ -19,12 +19,12 @@ import (
 )
 
 const (
-	registerEndpoint    = "/api/agent/delegates/register?accountId=%s"
-	heartbeatEndpoint   = "/api/agent/delegates/heartbeat-with-polling?accountId=%s"
-	taskPollEndpoint    = "/api/agent/delegates/%s/task-events?accountId=%s"
-	taskAcquireEndpoint = "/api/agent/v2/delegates/%s/tasks/%s/acquire?accountId=%s&delegateInstanceId=%s"
-	taskStatusEndpoint  = "/api/agent/v2/tasks/%s/delegates/%s?accountId=%s"
-	delegateCapEndpoint = "/api/agent/delegates/register-delegate-capacity/%s?accountId=%s"
+	registerEndpoint         = "/api/agent/delegates/register?accountId=%s"
+	heartbeatEndpoint        = "/api/agent/delegates/heartbeat-with-polling?accountId=%s"
+	taskPollEndpoint         = "/api/agent/delegates/%s/task-events?accountId=%s"
+	taskAcquireEndpoint      = "/api/agent/v2/delegates/%s/tasks/%s/acquire?accountId=%s&delegateInstanceId=%s"
+	taskStatusEndpoint       = "/api/agent/v2/tasks/%s/delegates/%s?accountId=%s"
+	delegateCapacityEndpoint = "/api/agent/delegates/register-delegate-capacity/%s?accountId=%s"
 )
 
 var (
@@ -94,10 +94,10 @@ func (p *HTTPClient) Heartbeat(ctx context.Context, r *client.RegisterRequest) e
 	return err
 }
 
-// Heartbeat sends a periodic heartbeat to the server
+// RegisterCapacity registers maximum number of CI Stages that can run on the host
 func (p *HTTPClient) RegisterCapacity(ctx context.Context, delID string, r *client.DelegateCapacity) error {
 	req := r
-	path := fmt.Sprintf(delegateCapEndpoint, delID, p.AccountID)
+	path := fmt.Sprintf(delegateCapacityEndpoint, delID, p.AccountID)
 	_, err := p.do(ctx, path, "POST", req, nil)
 	return err
 }

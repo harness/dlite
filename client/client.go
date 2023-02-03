@@ -77,7 +77,7 @@ type (
 	}
 
 	DelegateCapacity struct {
-		MaximumNumberOfBuilds int `json:"maximumNumberOfBuilds"`
+		MaxBuilds int `json:"maximumNumberOfBuilds"`
 	}
 )
 
