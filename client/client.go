@@ -75,6 +75,10 @@ type (
 		Type string          `json:"type"`
 		Code string          `json:"code"` // OK, FAILED, RETRY_ON_OTHER_DELEGATE
 	}
+
+	DelegateCapacity struct {
+		MaxBuilds int `json:"maximumNumberOfBuilds"`
+	}
 )
 
 // Client is an interface which defines methods on interacting with a task managing system.
@@ -93,4 +97,7 @@ type Client interface {
 
 	// SendStatus sends a response to the task server for a task ID
 	SendStatus(ctx context.Context, delegateID, taskID string, req *TaskResponse) error
+
+	// Register delegate capapcity for a host for CI tasks
+	RegisterCapacity(ctx context.Context, delegateID, req *DelegateCapacity) error
 }
