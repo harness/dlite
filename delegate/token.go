@@ -1,6 +1,7 @@
 package delegate
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"time"
 
@@ -11,6 +12,10 @@ import (
 
 // Token generates a token with the given expiry to interact with the Harness manager
 func Token(audience, issuer, subject, secret string, expiry time.Duration) (string, error) {
+	// secret can be base64 encoded as well
+	if decoded, err := base64.StdEncoding.DecodeString(secret); err == nil {
+		secret = string(decoded)
+	}
 	bytes, err := hex.DecodeString(secret)
 	if err != nil {
 		return "", err
