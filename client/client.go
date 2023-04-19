@@ -99,5 +99,5 @@ type Client interface {
 	SendStatus(ctx context.Context, delegateID, taskID string, req *TaskResponse) error
 
 	// Register delegate capapcity for a host for CI tasks
-	RegisterCapacity(ctx context.Context, delegateID, req *DelegateCapacity) error
+	RegisterCapacity(ctx context.Context, delegateID string, req *DelegateCapacity) error
 }
