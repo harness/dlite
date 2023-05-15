@@ -23,7 +23,8 @@ import (
 
 var (
 	// Time period between sending heartbeats to the server
-	hearbeatInterval = 10 * time.Second
+	hearbeatInterval  = 10 * time.Second
+	taskEventsTimeout = 60 * time.Second
 )
 
 type FilterFn func(*client.TaskEvent) bool
@@ -105,10 +106,12 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 				return
 			case <-pollTimer.C:
 				logrus.WithField("delegate_id", id).Info("polling for tasks")
-				tasks, err := p.Client.GetTaskEvents(ctx, id)
+				taskEventsCtx, cancelFn := context.WithTimeout(ctx, taskEventsTimeout)
+				tasks, err := p.Client.GetTaskEvents(taskEventsCtx, id)
 				if err != nil {
 					logrus.WithError(err).Errorf("could not query for task events")
 				}
+				cancelFn()
 				logrus.WithField("delegate_id", id).WithField("num_tasks", len(tasks.TaskEvents)).Info("received tasks")
 
 				// Search for a task event matching the filter
