@@ -23,7 +23,9 @@ import (
 
 var (
 	// Time period between sending heartbeats to the server
-	hearbeatInterval = 10 * time.Second
+	hearbeatInterval  = 10 * time.Second
+	heartbeatTimeout  = 15 * time.Second
+	taskEventsTimeout = 30 * time.Second
 )
 
 type FilterFn func(*client.TaskEvent) bool
@@ -105,10 +107,12 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 				return
 			case <-pollTimer.C:
 				logrus.WithField("delegate_id", id).Info("polling for tasks")
-				tasks, err := p.Client.GetTaskEvents(ctx, id)
+				taskEventsCtx, cancelFn := context.WithTimeout(ctx, taskEventsTimeout)
+				tasks, err := p.Client.GetTaskEvents(taskEventsCtx, id)
 				if err != nil {
 					logrus.WithError(err).Errorf("could not query for task events")
 				}
+				cancelFn()
 				logrus.WithField("delegate_id", id).WithField("num_tasks", len(tasks.TaskEvents)).Info("received tasks")
 
 				// Search for a task event matching the filter
@@ -232,10 +236,12 @@ func (p *Poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 				return
 			case <-msgDelayTimer.C:
 				req.LastHeartbeat = time.Now().UnixMilli()
-				err := p.Client.Heartbeat(ctx, req)
+				heartbeatCtx, cancelFn := context.WithTimeout(ctx, heartbeatTimeout)
+				err := p.Client.Heartbeat(heartbeatCtx, req)
 				if err != nil {
 					logrus.WithError(err).Errorf("could not send heartbeat")
 				}
+				cancelFn()
 			}
 		}
 	}()
