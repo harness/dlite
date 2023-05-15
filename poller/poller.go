@@ -24,6 +24,7 @@ import (
 var (
 	// Time period between sending heartbeats to the server
 	hearbeatInterval  = 10 * time.Second
+	heartbeatTimeout  = 15 * time.Second
 	taskEventsTimeout = 30 * time.Second
 )
 
@@ -235,10 +236,12 @@ func (p *Poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 				return
 			case <-msgDelayTimer.C:
 				req.LastHeartbeat = time.Now().UnixMilli()
-				err := p.Client.Heartbeat(ctx, req)
+				heartbeatCtx, cancelFn := context.WithTimeout(ctx, heartbeatTimeout)
+				err := p.Client.Heartbeat(heartbeatCtx, req)
 				if err != nil {
 					logrus.WithError(err).Errorf("could not send heartbeat")
 				}
+				cancelFn()
 			}
 		}
 	}()
