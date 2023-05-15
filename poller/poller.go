@@ -24,7 +24,7 @@ import (
 var (
 	// Time period between sending heartbeats to the server
 	hearbeatInterval  = 10 * time.Second
-	taskEventsTimeout = 60 * time.Second
+	taskEventsTimeout = 30 * time.Second
 )
 
 type FilterFn func(*client.TaskEvent) bool
