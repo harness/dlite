@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -40,7 +43,7 @@ var defaultClient = &http.Client{
 }
 
 // New returns a new client.
-func New(endpoint, id, secret string, skipverify bool) *HTTPClient {
+func New(endpoint, id, secret string, skipverify bool, additionalCertsDir string) *HTTPClient {
 	log := logrus.New()
 	cache := NewTokenCache(id, secret)
 	c := &HTTPClient{
@@ -63,8 +66,64 @@ func New(endpoint, id, secret string, skipverify bool) *HTTPClient {
 				},
 			},
 		}
+	} else if additionalCertsDir != "" {
+		// If additional certs are specified, we append them to the existing cert chain
+
+		// Use the system certs if possible
+		rootCAs, _ := x509.SystemCertPool()
+		if rootCAs == nil {
+			rootCAs = x509.NewCertPool()
+		}
+
+		log.Infof("additional certs dir to allow: %s\n", additionalCertsDir)
+
+		files, err := os.ReadDir(additionalCertsDir)
+		if err != nil {
+			log.Errorf("could not read directory %s, error: %s", additionalCertsDir, err)
+			c.Client = clientWithRootCAs(skipverify, rootCAs)
+			return c
+		}
+
+		// Go through all certs in this directory and add them to the global certs
+		for _, f := range files {
+			path := filepath.Join(additionalCertsDir, f.Name())
+			log.Infof("trying to add certs at: %s to root certs\n", path)
+			// Create TLS config using cert PEM
+			rootPem, err := os.ReadFile(path)
+			if err != nil {
+				log.Errorf("could not read certificate file (%s), error: %s", path, err.Error())
+				continue
+			}
+			// Append certs to the global certs
+			ok := rootCAs.AppendCertsFromPEM(rootPem)
+			if !ok {
+				log.Errorf("error adding cert (%s) to pool, please check format of the certs provided.", path)
+				continue
+			}
+			log.Infof("successfully added cert at: %s to root certs", path)
+		}
+		c.Client = clientWithRootCAs(skipverify, rootCAs)
 	}
 	return c
+}
+func clientWithRootCAs(skipverify bool, rootCAs *x509.CertPool) *http.Client {
+	// Create the HTTP Client with certs
+	config := &tls.Config{
+		//nolint:gosec
+		InsecureSkipVerify: skipverify,
+	}
+	if rootCAs != nil {
+		config.RootCAs = rootCAs
+	}
+	return &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Transport: &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: config,
+		},
+	}
 }
 
 // An HTTPClient manages communication with the runner API.
