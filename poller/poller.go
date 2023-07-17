@@ -106,14 +106,12 @@ func (p *Poller) Poll(ctx context.Context, n int, id string, interval time.Durat
 				logrus.Error("context canceled")
 				return
 			case <-pollTimer.C:
-				logrus.WithField("delegate_id", id).Info("polling for tasks")
 				taskEventsCtx, cancelFn := context.WithTimeout(ctx, taskEventsTimeout)
 				tasks, err := p.Client.GetTaskEvents(taskEventsCtx, id)
 				if err != nil {
 					logrus.WithError(err).Errorf("could not query for task events")
 				}
 				cancelFn()
-				logrus.WithField("delegate_id", id).WithField("num_tasks", len(tasks.TaskEvents)).Info("received tasks")
 
 				// Search for a task event matching the filter
 				for _, ev := range tasks.TaskEvents {
