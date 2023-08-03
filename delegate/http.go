@@ -204,6 +204,7 @@ func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out int
 			if (ignoreStatusCode && err != nil) || res.StatusCode > 501 {
 				p.logger().Errorf("http: server error: re-connect and re-try: %s", err)
 				if duration == backoff.Stop {
+					p.logger().Errorf("max retry limit reached, task status won't be updated")
 					return nil, err
 				}
 				time.Sleep(duration)
@@ -212,6 +213,7 @@ func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out int
 		} else if err != nil {
 			p.logger().Errorf("http: request error: %s", err)
 			if duration == backoff.Stop {
+				p.logger().Errorf("max retry limit reached, task status won't be updated")
 				return nil, err
 			}
 			time.Sleep(duration)
