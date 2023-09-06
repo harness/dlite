@@ -184,7 +184,7 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 		Code: "OK",
 		Type: task.Type,
 	}
-	err = p.Client.SendStatus(ctx, delegateID, taskID, taskResponse)
+	err = p.Client.SendStatus(context.Background(), delegateID, taskID, taskResponse)
 	if err != nil {
 		return errors.Wrap(err, "failed to send step status")
 	}
