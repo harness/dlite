@@ -44,8 +44,15 @@ var defaultClient = &http.Client{
 
 // New returns a new client.
 func New(endpoint, id, secret string, skipverify bool, additionalCertsDir string) *HTTPClient {
+	return getClient(endpoint, id, "", NewTokenCache(id, secret), skipverify, additionalCertsDir)
+}
+
+func NewFromToken(endpoint, id, token string, skipverify bool, additionalCertsDir string) *HTTPClient {
+	return getClient(endpoint, id, token, nil, skipverify, additionalCertsDir)
+}
+
+func getClient(endpoint, id, token string, cache *TokenCache, skipverify bool, additionalCertsDir string) *HTTPClient {
 	log := logrus.New()
-	cache := NewTokenCache(id, secret)
 	c := &HTTPClient{
 		Logger:            log,
 		Endpoint:          endpoint,
@@ -53,6 +60,7 @@ func New(endpoint, id, secret string, skipverify bool, additionalCertsDir string
 		AccountID:         id,
 		Client:            defaultClient,
 		AccountTokenCache: cache,
+		Token:             token,
 	}
 	if skipverify {
 		c.Client = &http.Client{
@@ -106,6 +114,7 @@ func New(endpoint, id, secret string, skipverify bool, additionalCertsDir string
 	}
 	return c
 }
+
 func clientWithRootCAs(skipverify bool, rootCAs *x509.CertPool) *http.Client {
 	// Create the HTTP Client with certs
 	config := &tls.Config{
@@ -134,6 +143,7 @@ type HTTPClient struct {
 	AccountID         string
 	AccountTokenCache *TokenCache
 	SkipVerify        bool
+	Token             string
 }
 
 // Register registers the runner with the manager
@@ -245,10 +255,15 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 
 	// the request should include the secret shared between
 	// the agent and server for authorization.
-	token, err := p.AccountTokenCache.Get()
-	if err != nil {
-		p.logger().Errorf("could not generate account token: %s", err)
-		return nil, err
+	token := ""
+	if p.Token != "" {
+		token = p.Token
+	} else {
+		token, err = p.AccountTokenCache.Get()
+		if err != nil {
+			p.logger().Errorf("could not generate account token: %s", err)
+			return nil, err
+		}
 	}
 	req.Header.Add("Authorization", "Delegate "+token)
 	req.Header.Add("Content-Type", "application/json")
