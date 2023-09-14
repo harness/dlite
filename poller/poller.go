@@ -178,10 +178,14 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 
 	writer := NewResponseWriter()
 	p.Router.Route(task.Type).ServeHTTP(writer, req)
+	responseCode := "OK"
+	if writer.status == 500 && task.Type == "DLITE_CI_VM_INITIALIZE_TASK" {
+		responseCode = "RETRY_ON_OTHER_DELEGATE"
+	}
 	taskResponse := &client.TaskResponse{
 		ID:   task.ID,
 		Data: writer.buf.Bytes(),
-		Code: "OK",
+		Code: responseCode,
 		Type: task.Type,
 	}
 	err = p.Client.SendStatus(context.Background(), delegateID, taskID, taskResponse)
