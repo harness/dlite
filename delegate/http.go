@@ -31,8 +31,9 @@ const (
 )
 
 var (
-	registerTimeout   = 30 * time.Second
-	taskEventsTimeout = 60 * time.Second
+	registerTimeout      = 30 * time.Second
+	taskEventsTimeout    = 60 * time.Second
+	sendStatusRetryTimes = 5
 )
 
 // defaultClient is the default http.Client.
@@ -191,7 +192,15 @@ func (p *HTTPClient) Acquire(ctx context.Context, delegateID, taskID string) (*c
 func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, r *client.TaskResponse) error {
 	path := fmt.Sprintf(taskStatusEndpoint, taskID, delegateID, p.AccountID)
 	req := r
-	_, err := p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true) //nolint: bodyclose
+	retryNumber := 0
+	var err error
+	for retryNumber < sendStatusRetryTimes {
+		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true) //nolint: bodyclose
+		if err == nil {
+			return nil
+		}
+		retryNumber++
+	}
 	return err
 }
 
