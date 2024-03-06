@@ -155,7 +155,8 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 	defer p.m.Delete(taskID)
 	task, err := p.Client.Acquire(ctx, delegateID, taskID)
 	if err != nil {
-		return errors.Wrap(err, "failed to acquire task")
+		logrus.WithError(err).WithField("task_id", taskID).Warnln("failed to acquire task")
+		return nil
 	}
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(task)
