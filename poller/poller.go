@@ -155,6 +155,8 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 	defer p.m.Delete(taskID)
 	task, err := p.Client.Acquire(ctx, delegateID, taskID)
 	if err != nil {
+		// Log warning error when unable to acquire task
+		// Decrease error rate for dlite when CI_DLITE_DISTRIBUTED FF is enabled
 		logrus.WithError(err).WithField("task_id", taskID).Warnln("failed to acquire task")
 		return nil
 	}
