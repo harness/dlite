@@ -76,6 +76,14 @@ type (
 		Code string          `json:"code"` // OK, FAILED, RETRY_ON_OTHER_DELEGATE
 	}
 
+	RunnerTaskResponse struct {
+		ID    string `json:"id"`
+		Type  string `json:"type"`
+		Code  string `json:"code"` // UNKNOWN, OK, FAILED, TIMEOUT
+		Error string `json:"error"`
+		Data  []byte `json:"data"`
+	}
+
 	DelegateCapacity struct {
 		MaxBuilds int `json:"maximumNumberOfBuilds"`
 	}
