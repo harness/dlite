@@ -181,18 +181,45 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 
 	writer := NewResponseWriter()
 	p.Router.Route(task.Type).ServeHTTP(writer, req)
+
+	if task.RunnerResponse {
+		err = p.sendRunnerResponse(task, writer, delegateID, taskID)
+	} else {
+		err = p.sendLegacyResponse(task, writer, delegateID, taskID)
+	}
+
+	if err != nil {
+		return errors.Wrap(err, "failed to send step status")
+	}
+	logrus.Infof("[Thread %d]: successfully completed task execution of taskID: %s of type: %s", i, taskID, task.Type)
+	return nil
+}
+
+func (p *Poller) sendLegacyResponse(task *client.Task, writer *response, delegateID string, taskID string) error {
 	taskResponse := &client.TaskResponse{
 		ID:   task.ID,
 		Data: writer.buf.Bytes(),
 		Code: "OK",
 		Type: task.Type,
 	}
-	err = p.Client.SendStatus(context.Background(), delegateID, taskID, taskResponse)
-	if err != nil {
-		return errors.Wrap(err, "failed to send step status")
+	return p.Client.SendStatus(context.Background(), delegateID, taskID, taskResponse)
+}
+
+func (p *Poller) sendRunnerResponse(task *client.Task, writer *response, delegateID string, taskID string) error {
+	status := client.Success
+	errorMsg := ""
+	if writer.status < 200 && writer.status >= 300 {
+		status = client.Failure
+		errorMsg = fmt.Sprintf("Failed executing task with error code %v", writer.status)
 	}
-	logrus.Infof("[Thread %d]: successfully completed task execution of taskID: %s of type: %s", i, taskID, task.Type)
-	return nil
+	taskResponse := &client.RunnerTaskResponse{
+		ID:    task.ID,
+		Data:  writer.buf.Bytes(),
+		Code:  status,
+		Error: errorMsg,
+		Type:  task.Type,
+	}
+	return p.Client.SendRunnerStatus(context.Background(), delegateID, taskID, taskResponse)
 }
 
 // Register registers the runner and runs a background thread which keeps pinging the server

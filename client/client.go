@@ -48,14 +48,15 @@ type (
 	}
 
 	Task struct {
-		ID           string          `json:"id"`
-		Type         string          `json:"type"`
-		Data         json.RawMessage `json:"data"`
-		Async        bool            `json:"async"`
-		Timeout      int             `json:"timeout"`
-		Logging      LogInfo         `json:"logging"`
-		DelegateInfo DelegateInfo    `json:"delegate"`
-		Capabilities json.RawMessage `json:"capabilities"`
+		ID             string          `json:"id"`
+		Type           string          `json:"type"`
+		Data           json.RawMessage `json:"data"`
+		Async          bool            `json:"async"`
+		RunnerResponse bool            `json:"runnerResponse"`
+		Timeout        int             `json:"timeout"`
+		Logging        LogInfo         `json:"logging"`
+		DelegateInfo   DelegateInfo    `json:"delegate"`
+		Capabilities   json.RawMessage `json:"capabilities"`
 	}
 
 	LogInfo struct {
@@ -77,16 +78,27 @@ type (
 	}
 
 	RunnerTaskResponse struct {
-		ID    string `json:"id"`
-		Type  string `json:"type"`
-		Code  string `json:"code"` // UNKNOWN, OK, FAILED, TIMEOUT
-		Error string `json:"error"`
-		Data  []byte `json:"data"`
+		ID    string          `json:"id"`
+		Type  string          `json:"type"`
+		Code  ResponseCode    `json:"code"`
+		Error string          `json:"error"`
+		Data  json.RawMessage `json:"data"`
 	}
 
 	DelegateCapacity struct {
 		MaxBuilds int `json:"maximumNumberOfBuilds"`
 	}
+)
+
+type (
+	ResponseCode string
+)
+
+const (
+	Unknown ResponseCode = "UNKNOWN"
+	Success ResponseCode = "OK"
+	Failure ResponseCode = "FAILED"
+	Timeout ResponseCode = "TIMEOUT"
 )
 
 // Client is an interface which defines methods on interacting with a task managing system.
@@ -105,6 +117,9 @@ type Client interface {
 
 	// SendStatus sends a response to the task server for a task ID
 	SendStatus(ctx context.Context, delegateID, taskID string, req *TaskResponse) error
+
+	// SendRunnerStatus sends a response to the task server using the RunnerResponse endpoint
+	SendRunnerStatus(ctx context.Context, delegateID, taskID string, r *RunnerTaskResponse) error
 
 	// Register delegate capapcity for a host for CI tasks
 	RegisterCapacity(ctx context.Context, delegateID string, req *DelegateCapacity) error
