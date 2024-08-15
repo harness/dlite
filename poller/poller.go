@@ -214,7 +214,7 @@ func (p *Poller) sendRunnerResponse(task *client.Task, writer *response, delegat
 	}
 	taskResponse := &client.RunnerTaskResponse{
 		ID:    task.ID,
-		Data:  writer.buf.Bytes(),
+		Data:  json.RawMessage(writer.buf.Bytes()),
 		Code:  status,
 		Error: errorMsg,
 		Type:  task.Type,
