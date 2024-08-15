@@ -78,11 +78,11 @@ type (
 	}
 
 	RunnerTaskResponse struct {
-		ID    string          `json:"id"`
-		Type  string          `json:"type"`
-		Code  ResponseCode    `json:"code"`
-		Error string          `json:"error"`
-		Data  json.RawMessage `json:"data"`
+		ID    string       `json:"id"`
+		Type  string       `json:"type"`
+		Code  ResponseCode `json:"code"`
+		Error string       `json:"error"`
+		Data  []byte       `json:"data"`
 	}
 
 	DelegateCapacity struct {
