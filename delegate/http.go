@@ -27,6 +27,7 @@ const (
 	taskPollEndpoint         = "/api/agent/delegates/%s/task-events?accountId=%s"
 	taskAcquireEndpoint      = "/api/agent/v2/delegates/%s/tasks/%s/acquire?accountId=%s&delegateInstanceId=%s"
 	taskStatusEndpoint       = "/api/agent/v2/tasks/%s/delegates/%s?accountId=%s"
+	runnerTaskStatusEndpoint = "/api/executions/%s/response?accountId=%s&delegateId=%s"
 	delegateCapacityEndpoint = "/api/agent/delegates/register-delegate-capacity/%s?accountId=%s"
 )
 
@@ -191,6 +192,21 @@ func (p *HTTPClient) Acquire(ctx context.Context, delegateID, taskID string) (*c
 // SendStatus updates the status of a task
 func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, r *client.TaskResponse) error {
 	path := fmt.Sprintf(taskStatusEndpoint, taskID, delegateID, p.AccountID)
+	req := r
+	retryNumber := 0
+	var err error
+	for retryNumber < sendStatusRetryTimes {
+		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true) //nolint: bodyclose
+		if err == nil {
+			return nil
+		}
+		retryNumber++
+	}
+	return err
+}
+
+func (p *HTTPClient) SendRunnerStatus(ctx context.Context, delegateID, taskID string, r *client.RunnerTaskResponse) error {
+	path := fmt.Sprintf(runnerTaskStatusEndpoint, taskID, p.AccountID, delegateID)
 	req := r
 	retryNumber := 0
 	var err error
