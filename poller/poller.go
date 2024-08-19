@@ -195,7 +195,7 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 	return nil
 }
 
-func (p *Poller) sendLegacyResponse(task *client.Task, writer *response, delegateID string, taskID string) error {
+func (p *Poller) sendLegacyResponse(task *client.Task, writer *response, delegateID, taskID string) error {
 	taskResponse := &client.TaskResponse{
 		ID:   task.ID,
 		Data: writer.buf.Bytes(),
@@ -205,7 +205,7 @@ func (p *Poller) sendLegacyResponse(task *client.Task, writer *response, delegat
 	return p.Client.SendStatus(context.Background(), delegateID, taskID, taskResponse)
 }
 
-func (p *Poller) sendRunnerResponse(task *client.Task, writer *response, delegateID string, taskID string) error {
+func (p *Poller) sendRunnerResponse(task *client.Task, writer *response, delegateID, taskID string) error {
 	status := client.Success
 	errorMsg := ""
 	if writer.status < 200 && writer.status >= 300 {
