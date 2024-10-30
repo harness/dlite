@@ -55,7 +55,7 @@ func NewFromToken(endpoint, id, token string, skipverify bool, additionalCertsDi
 
 func getClient(endpoint, id, token string, cache *TokenCache, skipverify bool, additionalCertsDir string) *HTTPClient {
 	log := logrus.New()
-	c := &HTTPClient{
+	client := &HTTPClient{
 		Logger:            log,
 		Endpoint:          endpoint,
 		SkipVerify:        skipverify,
@@ -64,67 +64,91 @@ func getClient(endpoint, id, token string, cache *TokenCache, skipverify bool, a
 		AccountTokenCache: cache,
 		Token:             token,
 	}
-	if skipverify {
-		c.Client = &http.Client{
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: skipverify, //nolint:gosec
-				},
-			},
-		}
-	} else if additionalCertsDir != "" {
-		// If additional certs are specified, we append them to the existing cert chain
 
-		// Use the system certs if possible
-		rootCAs, _ := x509.SystemCertPool()
-		if rootCAs == nil {
-			rootCAs = x509.NewCertPool()
-		}
+	// Load mTLS certificates if available
+	fmt.Print("mtls check begin")
+	mtlsEnabled, mtlsCerts := loadMTLSCerts("/etc/mtls/client.crt", "/etc/mtls/client.key")
 
-		log.Infof("additional certs dir to allow: %s\n", additionalCertsDir)
+	// Load custom root CAs if additional certificates directory is provided
+	rootCAs := loadRootCAs(additionalCertsDir)
 
-		files, err := os.ReadDir(additionalCertsDir)
-		if err != nil {
-			log.Errorf("could not read directory %s, error: %s", additionalCertsDir, err)
-			c.Client = clientWithRootCAs(skipverify, rootCAs)
-			return c
-		}
-
-		// Go through all certs in this directory and add them to the global certs
-		for _, f := range files {
-			path := filepath.Join(additionalCertsDir, f.Name())
-			log.Infof("trying to add certs at: %s to root certs\n", path)
-			// Create TLS config using cert PEM
-			rootPem, err := os.ReadFile(path)
-			if err != nil {
-				log.Errorf("could not read certificate file (%s), error: %s", path, err.Error())
-				continue
-			}
-			// Append certs to the global certs
-			ok := rootCAs.AppendCertsFromPEM(rootPem)
-			if !ok {
-				log.Errorf("error adding cert (%s) to pool, please check format of the certs provided.", path)
-				continue
-			}
-			log.Infof("successfully added cert at: %s to root certs", path)
-		}
-		c.Client = clientWithRootCAs(skipverify, rootCAs)
+	// Only create HTTP client if needed (mTLS, additional certs, or skipverify)
+	if skipverify || rootCAs != nil || mtlsEnabled {
+		fmt.Print(" inside if check mtls check begin")
+		client.Client = clientWithTLSConfig(skipverify, rootCAs, mtlsEnabled, mtlsCerts)
 	}
-	return c
+
+	return client
 }
 
-func clientWithRootCAs(skipverify bool, rootCAs *x509.CertPool) *http.Client {
+func loadRootCAs(additionalCertsDir string) *x509.CertPool {
+	if additionalCertsDir == "" {
+		return nil
+	}
+
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	fmt.Printf("additional certs dir to allow: %s\n", additionalCertsDir)
+
+	files, err := os.ReadDir(additionalCertsDir)
+	if err != nil {
+		fmt.Errorf("could not read directory %s, error: %s", additionalCertsDir, err)
+		return rootCAs
+	}
+
+	// Go through all certs in this directory and add them to the global certs
+	for _, f := range files {
+		path := filepath.Join(additionalCertsDir, f.Name())
+		fmt.Printf("trying to add certs at: %s to root certs\n", path)
+		// Create TLS config using cert PEM
+		rootPem, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Println(fmt.Errorf("could not read certificate file (%s), error: %s", path, err.Error()))
+			continue
+		}
+		// Append certs to the global certs
+		ok := rootCAs.AppendCertsFromPEM(rootPem)
+		if !ok {
+			fmt.Println(fmt.Errorf("error adding cert (%s) to pool, please check format of the certs provided", path))
+			continue
+		}
+		fmt.Printf("successfully added cert at: %s to root certs", path)
+	}
+	return rootCAs
+}
+
+// loadMTLSCerts loads mTLS certificates if they exist
+func loadMTLSCerts(certFile, keyFile string) (bool, tls.Certificate) {
+	if fileExists(certFile) && fileExists(keyFile) {
+		mtlsCerts, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			fmt.Printf("failed to load mTLS cert/key pair, error: %s\n", err)
+			return false, tls.Certificate{}
+		}
+		return true, mtlsCerts
+	}
+	return false, tls.Certificate{}
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	return err == nil && !info.IsDir()
+}
+
+func clientWithTLSConfig(skipverify bool, rootCAs *x509.CertPool, mtlsEnabled bool, cert tls.Certificate) *http.Client {
 	// Create the HTTP Client with certs
 	config := &tls.Config{
 		//nolint:gosec
 		InsecureSkipVerify: skipverify,
 	}
-	if rootCAs != nil {
+	if !skipverify && rootCAs != nil {
 		config.RootCAs = rootCAs
+	}
+	if mtlsEnabled {
+		config.Certificates = []tls.Certificate{cert}
 	}
 	return &http.Client{
 		CheckRedirect: func(*http.Request, []*http.Request) error {
