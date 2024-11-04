@@ -66,10 +66,10 @@ func getClient(endpoint, id, token string, cache *TokenCache, skipverify bool, a
 	}
 
 	// Load mTLS certificates if available
-	mtlsEnabled, mtlsCerts := loadMTLSCerts("/etc/mtls/client.crt", "/etc/mtls/client.key")
+	mtlsEnabled, mtlsCerts := loadMTLSCerts(log, "/etc/mtls/client.crt", "/etc/mtls/client.key")
 
 	// Load custom root CAs if additional certificates directory is provided
-	rootCAs := loadRootCAs(additionalCertsDir)
+	rootCAs := loadRootCAs(log, additionalCertsDir)
 
 	// Only create HTTP client if needed (mTLS, additional certs, or skipverify)
 	if skipverify || rootCAs != nil || mtlsEnabled {
@@ -79,7 +79,7 @@ func getClient(endpoint, id, token string, cache *TokenCache, skipverify bool, a
 	return httpClient
 }
 
-func loadRootCAs(additionalCertsDir string) *x509.CertPool {
+func loadRootCAs(log *logrus.Logger, additionalCertsDir string) *x509.CertPool {
 	if additionalCertsDir == "" {
 		return nil
 	}
@@ -89,41 +89,41 @@ func loadRootCAs(additionalCertsDir string) *x509.CertPool {
 		rootCAs = x509.NewCertPool()
 	}
 
-	fmt.Printf("additional certs dir to allow: %s\n", additionalCertsDir)
+	log.Infof("additional certs dir to allow: %s\n", additionalCertsDir)
 
 	files, err := os.ReadDir(additionalCertsDir)
 	if err != nil {
-		fmt.Printf("could not read directory %s, error: %s", additionalCertsDir, err)
+		log.Errorf("could not read directory %s, error: %s", additionalCertsDir, err)
 		return rootCAs
 	}
 
 	// Go through all certs in this directory and add them to the global certs
 	for _, f := range files {
 		path := filepath.Join(additionalCertsDir, f.Name())
-		fmt.Printf("trying to add certs at: %s to root certs\n", path)
+		log.Infof("trying to add certs at: %s to root certs\n", path)
 		// Create TLS config using cert PEM
 		rootPem, err := os.ReadFile(path)
 		if err != nil {
-			fmt.Println(fmt.Errorf("could not read certificate file (%s), error: %s", path, err.Error()))
+			log.Errorf("could not read certificate file (%s), error: %s", path, err.Error())
 			continue
 		}
 		// Append certs to the global certs
 		ok := rootCAs.AppendCertsFromPEM(rootPem)
 		if !ok {
-			fmt.Println(fmt.Errorf("error adding cert (%s) to pool, please check format of the certs provided", path))
+			log.Errorf("error adding cert (%s) to pool, please check format of the certs provided", path)
 			continue
 		}
-		fmt.Printf("successfully added cert at: %s to root certs", path)
+		log.Infof("successfully added cert at: %s to root certs", path)
 	}
 	return rootCAs
 }
 
 // loadMTLSCerts loads mTLS certificates if they exist
-func loadMTLSCerts(certFile, keyFile string) (bool, tls.Certificate) {
+func loadMTLSCerts(log *logrus.Logger, certFile, keyFile string) (bool, tls.Certificate) {
 	if fileExists(certFile) && fileExists(keyFile) {
 		mtlsCerts, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
-			fmt.Printf("failed to load mTLS cert/key pair, error: %s\n", err)
+			log.Errorf("failed to load mTLS cert/key pair, error: %s\n", err)
 			return false, tls.Certificate{}
 		}
 		return true, mtlsCerts
