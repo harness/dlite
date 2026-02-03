@@ -9,7 +9,6 @@ require (
 	github.com/icrowley/fake v0.0.0-20220625154756-3c7517006344
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.4.2
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 )
