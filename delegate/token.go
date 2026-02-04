@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // Token generates a token with the given expiry to interact with the Harness manager
@@ -33,7 +33,7 @@ func Token(audience, issuer, subject, secret string, expiry time.Duration) (stri
 		IssuedAt: jwt.NewNumericDate(time.Now()),
 		ID:       uuid.New().String(),
 	}
-	raw, err := jwt.Encrypted(enc).Claims(cl).CompactSerialize()
+	raw, err := jwt.Encrypted(enc).Claims(cl).Serialize()
 	if err != nil {
 		return "", err
 	}

@@ -13,11 +13,9 @@ import (
 	"time"
 
 	"github.com/icrowley/fake"
+	"github.com/sirupsen/logrus"
 	"github.com/wings-software/dlite/client"
 	"github.com/wings-software/dlite/router"
-
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"k8s.io/utils/strings/slices"
 )
 
@@ -73,7 +71,7 @@ func (p *Poller) SetFilter(filter FilterFn) {
 func (p *Poller) Register(ctx context.Context) (*DelegateInfo, error) {
 	host, err := os.Hostname()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get host name")
+		return nil, fmt.Errorf("could not get host name: %w", err)
 	}
 	host = "dlite-" + strings.ReplaceAll(host, " ", "-")
 	ip := getOutboundIP()
@@ -163,7 +161,7 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(task)
 	if err != nil {
-		return errors.Wrap(err, "failed to encode task")
+		return fmt.Errorf("failed to encode task: %w", err)
 	}
 	logrus.Infof("[Thread %d]: successfully acquired taskID: %s of type: %s", i, taskID, task.Type)
 	if !slices.Contains(p.Router.Routes(), task.Type) { // should not happen
@@ -189,7 +187,7 @@ func (p *Poller) execute(ctx context.Context, delegateID string, ev client.TaskE
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "failed to send step status")
+		return fmt.Errorf("failed to send step status: %w", err)
 	}
 	logrus.Infof("[Thread %d]: successfully completed task execution of taskID: %s of type: %s", i, taskID, task.Type)
 	return nil
@@ -242,7 +240,7 @@ func (p *Poller) register(ctx context.Context, interval time.Duration, ip, host 
 	}
 	resp, err := p.Client.Register(ctx, req)
 	if err != nil {
-		return "", errors.Wrap(err, "could not register the runner")
+		return "", fmt.Errorf("could not register the runner: %w", err)
 	}
 	req.ID = resp.Resource.DelegateID
 	logrus.WithField("id", req.ID).WithField("host", req.HostName).
