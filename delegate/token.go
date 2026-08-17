@@ -9,9 +9,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Token generates a token with the given expiry to interact with the Harness manager
+// Token generates a token with the given expiry to interact with the Harness manager.
+// The secret is normalized first (base64-encoded UI tokens are decoded to their hex
+// form), mirroring how the Java delegate always feeds TokenGenerator the decoded token.
 func Token(audience, issuer, subject, secret string, expiry time.Duration) (string, error) {
-	bytes, err := hex.DecodeString(secret)
+	bytes, err := hex.DecodeString(normalizeSecret(secret))
 	if err != nil {
 		return "", err
 	}
