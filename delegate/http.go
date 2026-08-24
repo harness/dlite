@@ -38,6 +38,15 @@ var (
 	sendStatusRetryTimes = 5
 )
 
+// DelegateTokenHashHeader carries the delegate token's SHA-256 in the
+// manager's HashUtils.calculateSha256 format (BigInteger hex: leading zero
+// nibbles stripped, computed over the decoded hex token — see
+// normalizeSecret), letting the manager resolve the token through its indexed
+// hash instead of iterating over all active tokens of the account. Header
+// names are case-insensitive on the wire (RFC 7230); the manager reads this
+// header via a case-insensitive lookup.
+const DelegateTokenHashHeader = "delegateTokenHash"
+
 // defaultClient is the default http.Client.
 var defaultClient = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -52,6 +61,18 @@ func New(endpoint, id, secret string, skipverify bool, additionalCertsDir string
 
 func NewFromToken(endpoint, id, token string, skipverify bool, additionalCertsDir string) *HTTPClient {
 	return getClient(endpoint, id, token, nil, skipverify, additionalCertsDir)
+}
+
+// NewFromTokenWithHash returns a client that uses a pre-generated token and
+// also sends the provided token hash, letting the manager resolve the
+// delegate token through its indexed hash instead of iterating over all
+// active tokens of the account. The hash must be the token's SHA-256 in the
+// manager's HashUtils.calculateSha256 format (BigInteger hex), computed over
+// the decoded hex token.
+func NewFromTokenWithHash(endpoint, id, token, tokenHash string, skipverify bool, additionalCertsDir string) *HTTPClient {
+	c := getClient(endpoint, id, token, nil, skipverify, additionalCertsDir)
+	c.TokenHash = tokenHash
+	return c
 }
 
 func getClient(endpoint, id, token string, cache *TokenCache, skipverify bool, additionalCertsDir string) *HTTPClient {
@@ -169,6 +190,7 @@ type HTTPClient struct {
 	AccountTokenCache *TokenCache
 	SkipVerify        bool
 	Token             string
+	TokenHash         string
 }
 
 // Register registers the runner with the manager
@@ -330,6 +352,9 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 		}
 	}
 	req.Header.Add("Authorization", "Delegate "+token)
+	if hash := p.delegateTokenHash(); hash != "" {
+		req.Header.Add(DelegateTokenHashHeader, hash)
+	}
 	req.Header.Add("Content-Type", "application/json")
 	res, err := p.Client.Do(req)
 	if res != nil {
@@ -377,6 +402,19 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 		return res, nil
 	}
 	return res, json.Unmarshal(body, out)
+}
+
+// delegateTokenHash returns the hash to send with the request: the explicitly
+// provided hash for token-based clients, or the hash derived from the secret
+// for secret-based clients. Empty means the header is omitted.
+func (p *HTTPClient) delegateTokenHash() string {
+	if p.TokenHash != "" {
+		return p.TokenHash
+	}
+	if p.AccountTokenCache != nil {
+		return p.AccountTokenCache.GetTokenHash()
+	}
+	return ""
 }
 
 // logger is a helper function that returns the default logger
