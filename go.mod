@@ -1,6 +1,8 @@
 module github.com/wings-software/dlite
 
-go 1.26.10
+go 1.24.0
+
+toolchain go1.26.10
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
