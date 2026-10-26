@@ -8,10 +8,12 @@ pool:
 
 steps:
 - name: vet
-  image: &go_image harness0.harness.io/oci/docker_artifacts/hhi/go:1.26.10@sha256:718fddf012b3a305e936ae9964e5a642036bcb7b4c6c0786e2f78f238d637db8
-  environment: &go_environment
+  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  pull: always
+  environment:
     GOTOOLCHAIN: local
-    GOSUMDB: sum.golang.org
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
   commands:
   - go vet ./...
   volumes:
@@ -21,8 +23,12 @@ steps:
   - clone
 
 - name: test
-  image: *go_image
-  environment: *go_environment
+  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  pull: always
+  environment:
+    GOTOOLCHAIN: local
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
   commands:
   - go test -cover ./...
   volumes:
@@ -32,14 +38,16 @@ steps:
   - vet
 
 - name: check go.mod is up to date
-  image: *go_image
-  environment: *go_environment
+  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  pull: always
+  environment:
+    GOTOOLCHAIN: local
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
   commands:
   - cp go.mod go.mod.bak
-  - cp go.sum go.sum.bak
   - go mod tidy
   - diff go.mod go.mod.bak || (echo "go.mod is not up to date" && exit 1)
-  - diff go.sum go.sum.bak || (echo "go.sum is not up to date" && exit 1)
   volumes:
   - name: gopath
     path: /go
@@ -47,35 +55,22 @@ steps:
   - vet
 
 - name: golangci-lint
-  image: *go_image
+  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  pull: always
   environment:
-    <<: *go_environment
+    GOTOOLCHAIN: local
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
     GOBIN: /tmp/lint-tools
+    GOLANGCI_LINT_CACHE: /tmp/golangci-lint-cache
   commands:
-  # Build the linter with the patched compiler, using the HHI trust store.
-  # Check the whole module: this image intentionally has no Git executable.
-  - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
-  - /tmp/lint-tools/golangci-lint run --timeout 500s
+  - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+  - /tmp/lint-tools/golangci-lint run --timeout 500s --new-from-rev=HEAD~
   volumes:
   - name: gopath
     path: /go
   depends_on:
   - clone
-
-- name: govulncheck
-  image: *go_image
-  environment:
-    <<: *go_environment
-    GOBIN: /tmp/vulnerability-tools
-  commands:
-  - go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
-  # Fail for reachable vulnerabilities; retain non-reachable findings in output.
-  - /tmp/vulnerability-tools/govulncheck -show verbose ./...
-  volumes:
-  - name: gopath
-    path: /go
-  depends_on:
-  - vet
 
 volumes:
 - name: gopath

@@ -34,20 +34,20 @@ func Discard() Logger {
 
 type discard struct{}
 
-func (*discard) Debug(...interface{})                   {}
-func (*discard) Debugf(string, ...interface{})          {}
-func (*discard) Debugln(...interface{})                 {}
-func (*discard) Error(...interface{})                   {}
-func (*discard) Errorf(string, ...interface{})          {}
-func (*discard) Errorln(...interface{})                 {}
-func (*discard) Info(...interface{})                    {}
-func (*discard) Infof(string, ...interface{})           {}
-func (*discard) Infoln(...interface{})                  {}
-func (*discard) Trace(...interface{})                   {}
-func (*discard) Tracef(string, ...interface{})          {}
-func (*discard) Traceln(...interface{})                 {}
-func (*discard) Warn(...interface{})                    {}
-func (*discard) Warnf(string, ...interface{})           {}
-func (*discard) Warnln(...interface{})                  {}
-func (d *discard) WithError(error) Logger               { return d }
-func (d *discard) WithField(string, interface{}) Logger { return d }
+func (*discard) Debug(args ...interface{})                 {}
+func (*discard) Debugf(format string, args ...interface{}) {}
+func (*discard) Debugln(args ...interface{})               {}
+func (*discard) Error(args ...interface{})                 {}
+func (*discard) Errorf(format string, args ...interface{}) {}
+func (*discard) Errorln(args ...interface{})               {}
+func (*discard) Info(args ...interface{})                  {}
+func (*discard) Infof(format string, args ...interface{})  {}
+func (*discard) Infoln(args ...interface{})                {}
+func (*discard) Trace(args ...interface{})                 {}
+func (*discard) Tracef(format string, args ...interface{}) {}
+func (*discard) Traceln(args ...interface{})               {}
+func (*discard) Warn(args ...interface{})                  {}
+func (*discard) Warnf(format string, args ...interface{})  {}
+func (*discard) Warnln(args ...interface{})                {}
+func (d *discard) WithError(error) Logger                  { return d }
+func (d *discard) WithField(string, interface{}) Logger    { return d }

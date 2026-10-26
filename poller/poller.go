@@ -14,10 +14,9 @@ import (
 
 	"github.com/icrowley/fake"
 	"github.com/sirupsen/logrus"
-	"k8s.io/utils/strings/slices"
-
 	"github.com/wings-software/dlite/client"
 	"github.com/wings-software/dlite/router"
+	"k8s.io/utils/strings/slices"
 )
 
 var (
@@ -75,7 +74,7 @@ func (p *Poller) Register(ctx context.Context) (*DelegateInfo, error) {
 		return nil, fmt.Errorf("could not get host name: %w", err)
 	}
 	host = "dlite-" + strings.ReplaceAll(host, " ", "-")
-	ip := getOutboundIP(ctx)
+	ip := getOutboundIP()
 	id, err := p.register(ctx, hearbeatInterval, ip, host)
 	if err != nil {
 		logrus.WithField("ip", ip).WithField("host", host).WithError(err).Error("could not register runner")
@@ -275,8 +274,8 @@ func (p *Poller) heartbeat(ctx context.Context, req *client.RegisterRequest, int
 }
 
 // Get preferred outbound ip of this machine. It returns a fake IP in case of errors.
-func getOutboundIP(ctx context.Context) string {
-	conn, err := (&net.Dialer{}).DialContext(ctx, "udp", "8.8.8.8:80")
+func getOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		logrus.WithError(err).Error("could not figure out an IP, using a randomly generated IP")
 		return "fake-" + fake.IPv4()

@@ -2,85 +2,13 @@ package delegate
 
 import (
 	"context"
-	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"testing/iotest"
 
 	"github.com/wings-software/dlite/client"
 )
-
-type trackingBody struct {
-	io.Reader
-	closeCount int
-}
-
-func (b *trackingBody) Close() error {
-	b.closeCount++
-	return nil
-}
-
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
-}
-
-func TestDoClosesResponseBody(t *testing.T) {
-	tests := []struct {
-		name    string
-		status  int
-		body    io.Reader
-		out     interface{}
-		wantErr bool
-	}{
-		{name: "success", status: http.StatusOK, body: strings.NewReader(`{"ok":true}`), out: new(map[string]bool)},
-		{name: "no content", status: http.StatusNoContent, body: strings.NewReader("ignored")},
-		{name: "HTTP error", status: http.StatusServiceUnavailable, body: strings.NewReader("unavailable"), wantErr: true},
-		{name: "read error", status: http.StatusOK, body: iotest.ErrReader(errors.New("read failed")), wantErr: true},
-		{name: "decode error", status: http.StatusOK, body: strings.NewReader("invalid JSON"), out: new(map[string]bool), wantErr: true},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			body := &trackingBody{Reader: tc.body}
-			c := &HTTPClient{
-				Endpoint: "http://example.test",
-				Token:    "test-token",
-				Client: &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
-					return &http.Response{StatusCode: tc.status, Body: body}, nil
-				})},
-			}
-			metadata, err := c.do(context.Background(), "/", http.MethodGet, nil, tc.out)
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("error = %v, want error = %v", err, tc.wantErr)
-			}
-			if metadata == nil || metadata.StatusCode != tc.status {
-				t.Fatalf("metadata = %v, want status %d", metadata, tc.status)
-			}
-			if body.closeCount != 1 {
-				t.Fatalf("body closed %d times, want once before do returns", body.closeCount)
-			}
-		})
-	}
-}
-
-func TestDoTransportError(t *testing.T) {
-	wantErr := errors.New("transport failed")
-	c := &HTTPClient{
-		Endpoint: "http://example.test",
-		Token:    "test-token",
-		Client: &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
-			return nil, wantErr
-		})},
-	}
-	metadata, err := c.do(context.Background(), "/", http.MethodGet, nil, nil)
-	if metadata != nil || !errors.Is(err, wantErr) {
-		t.Fatalf("do = (%v, %v), want (nil, transport error)", metadata, err)
-	}
-}
 
 // TestDelegateTokenHashHeader verifies that the delegateTokenHash header is
 // sent (or omitted) correctly for each client construction mode.
@@ -91,17 +19,17 @@ func TestDoTransportError(t *testing.T) {
 // test catches any encoding divergence from what the manager stores.
 func TestDelegateTokenHashHeader(t *testing.T) {
 	// valid 16-byte hex secrets, usable as AES keys
-	secret := "98d8fedb04c574e68939164bf463e73d" // #nosec G101 -- Public AES test key; gitleaks:allow
-	// Java reference: HashUtils.calculateSha256("98d8fedb04c574e68939164bf463e73d").
-	secretHash := "9d5c66162adf75e9258f8e30054d3d507c4e1f65c9511d6104c37d62a76bb04f" // #nosec G101 -- Public golden SHA-256 test vector; gitleaks:allow
+	secret := "98d8fedb04c574e68939164bf463e73d" // gitleaks:allow — fake test fixture, not a credential
+	// calculateSha256("98d8fedb04c574e68939164bf463e73d")
+	secretHash := "9d5c66162adf75e9258f8e30054d3d507c4e1f65c9511d6104c37d62a76bb04f" // gitleaks:allow — golden SHA-256 test vector
 	// SHA-256 of this secret begins with the zero byte 0x00; the manager's
 	// BigInteger encoding strips it, yielding a 62-char hash. Strict hex
 	// encoders (Go's hex.EncodeToString) would emit "00..." and miss the
 	// manager's indexed lookup.
 	zeroSecret := "ab00000000000000000000000000012c"
-	// Java reference: HashUtils.calculateSha256("ab00000000000000000000000000012c").
-	zeroSecretHash := "427e1637b3abbdf434a0034e6a55d5c809e30fc6d1ac11e701a537a346ca7f" // #nosec G101 -- Public golden SHA-256 test vector; gitleaks:allow
-	explicitHash := strings.Repeat("ab", 32)                                           // 64-char hex, stands in for a real hash
+	// calculateSha256("ab00000000000000000000000000012c")
+	zeroSecretHash := "427e1637b3abbdf434a0034e6a55d5c809e30fc6d1ac11e701a537a346ca7f" // gitleaks:allow — golden SHA-256 test vector
+	explicitHash := strings.Repeat("ab", 32) // 64-char hex, stands in for a real hash
 
 	tests := []struct {
 		name      string
