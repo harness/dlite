@@ -76,6 +76,25 @@ The goal is for this client to become the defacto interface of interacting with 
 
 # Release Procedure
 
+## Security builds
+
+dlite is a Go library; this repository publishes source tags and does not build
+release binaries or runtime images. Its `toolchain` directive selects the preferred
+compiler when working in this module, but does not select the compiler used by
+applications that import it. The minimum Go version is 1.25 because the patched
+`golang.org/x/sys` dependency requires it.
+
+For the [eMudhra incident (GO-2026-6809)](https://pkg.go.dev/vuln/GO-2026-6809),
+consumers such as lite-engine and drone-runner-aws must update to the fixed dlite
+release and rebuild their binaries with Go 1.26.10 or a later patched release
+(Go 1.27 requires at least 1.27.3). Their build and runtime images must also use
+the updated trust store. This repository's CI uses the digest-pinned HHI Go image
+and disables toolchain downloads with `GOTOOLCHAIN=local`.
+
+After publishing the source release, rebuild, scan and publish each consuming
+application's artifacts before updating centralized image versions. Passing this
+library's CI does not verify already-published downstream binaries or images.
+
 ## Run the changelog generator
 
 ```BASH

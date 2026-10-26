@@ -8,7 +8,9 @@ pool:
 
 steps:
 - name: vet
-  image: harness0.harness.io/oci/docker_artifacts/hhi/go:1.26.10@sha256:718fddf012b3a305e936ae9964e5a642036bcb7b4c6c0786e2f78f238d637db8
+  image: &go_image harness0.harness.io/oci/docker_artifacts/hhi/go:1.26.10@sha256:718fddf012b3a305e936ae9964e5a642036bcb7b4c6c0786e2f78f238d637db8
+  environment: &go_environment
+    GOTOOLCHAIN: local
   commands:
   - go vet ./...
   volumes:
@@ -18,7 +20,8 @@ steps:
   - clone
 
 - name: test
-  image: harness0.harness.io/oci/docker_artifacts/hhi/go:1.26.10@sha256:718fddf012b3a305e936ae9964e5a642036bcb7b4c6c0786e2f78f238d637db8
+  image: *go_image
+  environment: *go_environment
   commands:
   - go test -cover ./...
   volumes:
@@ -28,11 +31,14 @@ steps:
   - vet
 
 - name: check go.mod is up to date
-  image: harness0.harness.io/oci/docker_artifacts/hhi/go:1.26.10@sha256:718fddf012b3a305e936ae9964e5a642036bcb7b4c6c0786e2f78f238d637db8
+  image: *go_image
+  environment: *go_environment
   commands:
   - cp go.mod go.mod.bak
+  - cp go.sum go.sum.bak
   - go mod tidy
   - diff go.mod go.mod.bak || (echo "go.mod is not up to date" && exit 1)
+  - diff go.sum go.sum.bak || (echo "go.sum is not up to date" && exit 1)
   volumes:
   - name: gopath
     path: /go
@@ -40,14 +46,37 @@ steps:
   - vet
 
 - name: golangci-lint
-  image: golangci/golangci-lint
+  image: *go_image
+  environment: *go_environment
   commands:
-  - golangci-lint run --timeout 500s --new-from-rev=HEAD~
+  # Build the linter with the patched compiler, using the HHI trust store.
+  # Check the whole module: this image intentionally has no Git executable.
+  - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+  - /go/bin/golangci-lint run --timeout 500s
   volumes:
   - name: gopath
     path: /go
   depends_on:
   - clone
+
+- name: govulncheck
+  image: *go_image
+  environment: *go_environment
+  commands:
+  - go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+  - /go/bin/govulncheck ./...
+  # Module scanning accepts no package patterns. Scan from each package because
+  # the module root has no Go files, including dependencies not reached on Linux.
+  - |
+    go list -f '{{.Dir}}' ./... > /tmp/dlite-package-dirs
+    while IFS= read -r dir; do
+      /go/bin/govulncheck -C "$dir" -scan module || exit 1
+    done < /tmp/dlite-package-dirs
+  volumes:
+  - name: gopath
+    path: /go
+  depends_on:
+  - vet
 
 volumes:
 - name: gopath

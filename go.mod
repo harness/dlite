@@ -1,12 +1,12 @@
 module github.com/wings-software/dlite
 
-go 1.24.0
+go 1.25.0
 
 toolchain go1.26.10
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/google/uuid v1.6.0
 	github.com/icrowley/fake v0.0.0-20220625154756-3c7517006344
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -17,5 +17,5 @@ require (
 
 require (
 	github.com/corpix/uarand v0.0.0-20170723150923-031be390f409 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 )
