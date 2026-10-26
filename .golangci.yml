@@ -53,6 +53,8 @@ linters:
     gocyclo:
       min-complexity: 25
     govet:
+      enable:
+        - shadow
       settings:
         printf:
           funcs:
@@ -78,33 +80,6 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      # do drains and closes response bodies before returning to these callers.
-      - linters:
-          - bodyclose
-        path: delegate/http\.go
-        source: '_, err := p\.do\(ctx, path,'
-      # These are public golden test vectors, not credentials.
-      - linters:
-          - gosec
-        path: delegate/http_test\.go
-        text: 'G101:'
-        source: 'gitleaks:allow.*(fake test fixture|golden SHA-256 test vector)'
-      # The request receives ctx with WithContext immediately after construction.
-      - linters:
-          - noctx
-        path: delegate/http\.go
-        source: 'req, err := http\.NewRequest\(method, endpoint, &buf\)'
-      # UDP Dial selects a local interface here; it does not send network traffic.
-      - linters:
-          - noctx
-        path: poller/poller\.go
-        source: 'conn, err := net\.Dial\("udp", "8\.8\.8\.8:80"\)'
-      # The discard logger intentionally ignores every argument.
-      - linters:
-          - revive
-        path: logger/logger\.go
-        text: 'unused-parameter:'
-        source: '^func \(\*discard\)'
       - linters:
           - mnd
         path: _test\.go
@@ -112,6 +87,7 @@ linters:
           - gocritic
         text: 'unnecessaryDefer:'
     paths:
+      - _gen\.go$
       - third_party$
       - builtin$
       - examples$
@@ -122,10 +98,11 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/golangci/golangci-lint
+        - github.com/wings-software/dlite
   exclusions:
     generated: lax
     paths:
+      - _gen\.go$
       - third_party$
       - builtin$
       - examples$

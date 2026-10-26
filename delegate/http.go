@@ -16,8 +16,8 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
-	"github.com/wings-software/dlite/client"
 
+	"github.com/wings-software/dlite/client"
 	"github.com/wings-software/dlite/logger"
 )
 
@@ -198,7 +198,7 @@ func (p *HTTPClient) Register(ctx context.Context, r *client.RegisterRequest) (*
 	req := r
 	resp := &client.RegisterResponse{}
 	path := fmt.Sprintf(registerEndpoint, p.AccountID)
-	_, err := p.retry(ctx, path, "POST", req, resp, createBackoff(ctx, registerTimeout), true) //nolint: bodyclose
+	_, err := p.retry(ctx, path, "POST", req, resp, createBackoff(ctx, registerTimeout), true)
 	return resp, err
 }
 
@@ -241,7 +241,7 @@ func (p *HTTPClient) SendStatus(ctx context.Context, delegateID, taskID string, 
 	retryNumber := 0
 	var err error
 	for retryNumber < sendStatusRetryTimes {
-		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true) //nolint: bodyclose
+		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true)
 		if err == nil {
 			return nil
 		}
@@ -257,7 +257,7 @@ func (p *HTTPClient) SendStatusV2(ctx context.Context, runnerID, taskID string, 
 	retryNumber := 0
 	var err error
 	for retryNumber < sendStatusRetryTimes {
-		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true) //nolint: bodyclose
+		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true)
 		if err == nil {
 			return nil
 		}
@@ -272,7 +272,7 @@ func (p *HTTPClient) SendRunnerStatus(ctx context.Context, delegateID, taskID st
 	retryNumber := 0
 	var err error
 	for retryNumber < sendStatusRetryTimes {
-		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true) //nolint: bodyclose
+		_, err = p.retry(ctx, path, "POST", req, nil, createBackoff(ctx, taskEventsTimeout), true)
 		if err == nil {
 			return nil
 		}
@@ -281,7 +281,13 @@ func (p *HTTPClient) SendRunnerStatus(ctx context.Context, delegateID, taskID st
 	return err
 }
 
-func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOffContext, ignoreStatusCode bool) (*http.Response, error) { //nolint: unparam
+// responseMetadata carries status without transferring ownership of the body.
+// do drains and closes the body before returning this metadata.
+type responseMetadata struct {
+	StatusCode int
+}
+
+func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out interface{}, b backoff.BackOffContext, ignoreStatusCode bool) (*responseMetadata, error) { //nolint: unparam
 	for {
 		res, err := p.do(ctx, path, method, in, out)
 		// do not retry on Canceled or DeadlineExceeded
@@ -321,7 +327,7 @@ func (p *HTTPClient) retry(ctx context.Context, path, method string, in, out int
 
 // do is a helper function that posts a signed http request with
 // the input encoded and response decoded from json.
-func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interface{}) (*http.Response, error) {
+func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interface{}) (*responseMetadata, error) {
 	var buf bytes.Buffer
 
 	// marshal the input payload into json format and copy
@@ -333,11 +339,10 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 	}
 
 	endpoint := p.Endpoint + path
-	req, err := http.NewRequest(method, endpoint, &buf)
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, &buf)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
 
 	// the request should include the secret shared between
 	// the agent and server for authorization.
@@ -357,7 +362,9 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 	}
 	req.Header.Add("Content-Type", "application/json")
 	res, err := p.Client.Do(req)
+	var metadata *responseMetadata
 	if res != nil {
+		metadata = &responseMetadata{StatusCode: res.StatusCode}
 		defer func() {
 			// drain the response body so we can reuse
 			// this connection.
@@ -368,40 +375,40 @@ func (p *HTTPClient) do(ctx context.Context, path, method string, in, out interf
 		}()
 	}
 	if err != nil {
-		return res, err
+		return metadata, err
 	}
 
 	// if the response body return no content we exit
 	// immediately. We do not read or unmarshal the response
 	// and we do not return an error.
 	if res.StatusCode == 204 {
-		return res, nil
+		return metadata, nil
 	}
 
 	// else read the response body into a byte slice.
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return res, err
+		return metadata, err
 	}
 
 	if res.StatusCode > 299 {
 		// if the response body includes an error message
 		// we should return the error string.
 		if len(body) != 0 {
-			return res, errors.New(
+			return metadata, errors.New(
 				string(body),
 			)
 		}
 		// if the response body is empty we should return
 		// the default status code text.
-		return res, errors.New(
+		return metadata, errors.New(
 			http.StatusText(res.StatusCode),
 		)
 	}
 	if out == nil {
-		return res, nil
+		return metadata, nil
 	}
-	return res, json.Unmarshal(body, out)
+	return metadata, json.Unmarshal(body, out)
 }
 
 // delegateTokenHash returns the hash to send with the request: the explicitly

@@ -11,6 +11,7 @@ steps:
   image: &go_image harness0.harness.io/oci/docker_artifacts/hhi/go:1.26.10@sha256:718fddf012b3a305e936ae9964e5a642036bcb7b4c6c0786e2f78f238d637db8
   environment: &go_environment
     GOTOOLCHAIN: local
+    GOSUMDB: sum.golang.org
   commands:
   - go vet ./...
   volumes:
@@ -47,12 +48,14 @@ steps:
 
 - name: golangci-lint
   image: *go_image
-  environment: *go_environment
+  environment:
+    <<: *go_environment
+    GOBIN: /tmp/lint-tools
   commands:
   # Build the linter with the patched compiler, using the HHI trust store.
   # Check the whole module: this image intentionally has no Git executable.
   - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
-  - /go/bin/golangci-lint run --timeout 500s
+  - /tmp/lint-tools/golangci-lint run --timeout 500s
   volumes:
   - name: gopath
     path: /go
@@ -61,17 +64,13 @@ steps:
 
 - name: govulncheck
   image: *go_image
-  environment: *go_environment
+  environment:
+    <<: *go_environment
+    GOBIN: /tmp/vulnerability-tools
   commands:
   - go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
-  - /go/bin/govulncheck ./...
-  # Module scanning accepts no package patterns. Scan from each package because
-  # the module root has no Go files, including dependencies not reached on Linux.
-  - |
-    go list -f '{{.Dir}}' ./... > /tmp/dlite-package-dirs
-    while IFS= read -r dir; do
-      /go/bin/govulncheck -C "$dir" -scan module || exit 1
-    done < /tmp/dlite-package-dirs
+  # Fail for reachable vulnerabilities; retain non-reachable findings in output.
+  - /tmp/vulnerability-tools/govulncheck -show verbose ./...
   volumes:
   - name: gopath
     path: /go

@@ -84,16 +84,39 @@ compiler when working in this module, but does not select the compiler used by
 applications that import it. The minimum Go version is 1.25 because the patched
 `golang.org/x/sys` dependency requires it.
 
+This source release raises the minimum from Go 1.24 to Go 1.25. Consumers using
+an older compiler with toolchain downloads disabled must update their builder
+before upgrading dlite. The `go` directive enforces this dependency requirement;
+the preferred `toolchain` directive does not enforce a security-patched compiler
+in a consuming application.
+
 For the [eMudhra incident (GO-2026-6809)](https://pkg.go.dev/vuln/GO-2026-6809),
 consumers such as lite-engine and drone-runner-aws must update to the fixed dlite
 release and rebuild their binaries with Go 1.26.10 or a later patched release
-(Go 1.27 requires at least 1.27.3). Their build and runtime images must also use
+(Go 1.27 requires at least 1.27.3, as listed in the
+[official advisory's version ranges](https://vuln.go.dev/ID/GO-2026-6809.json)).
+Their build and runtime images must also use
 the updated trust store. This repository's CI uses the digest-pinned HHI Go image
 and disables toolchain downloads with `GOTOOLCHAIN=local`.
 
 After publishing the source release, rebuild, scan and publish each consuming
 application's artifacts before updating centralized image versions. Passing this
 library's CI does not verify already-published downstream binaries or images.
+
+The downstream release checks remain open until evidence is linked below:
+
+| Consumer | Fixed dlite source version | Patched compiler and trust store | Published artifact scan |
+| --- | --- | --- | --- |
+| [lite-engine](https://github.com/harness/lite-engine) | Pending source release and dependency update | Pending rebuild evidence | Pending |
+| [drone-runner-aws](https://github.com/harness/drone-runner-aws) | Pending source release and dependency update | Pending rebuild evidence | Pending |
+
+For each consumer, record the source version, builder and runtime image digests,
+`go version -m` output for the published binary, and its vulnerability scan.
+Do not mark the incident remediated for that consumer until these checks pass.
+When a new Go security fix is published, update the CI image tag and digest
+together and rerun tests, lint and govulncheck. Digest pins deliberately require
+an explicit update; `GOTOOLCHAIN=local` makes unexpected toolchain requirements
+fail instead of downloading an unreviewed compiler.
 
 ## Run the changelog generator
 
