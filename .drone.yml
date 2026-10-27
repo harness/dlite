@@ -8,7 +8,11 @@ pool:
 
 steps:
 - name: vet
-  image: golang:1.18
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
+  environment:
+    GOTOOLCHAIN: local
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
   commands:
   - go vet ./...
   volumes:
@@ -18,7 +22,11 @@ steps:
   - clone
 
 - name: test
-  image: golang:1.18
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
+  environment:
+    GOTOOLCHAIN: local
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
   commands:
   - go test -cover ./...
   volumes:
@@ -28,7 +36,11 @@ steps:
   - vet
 
 - name: check go.mod is up to date
-  image: golang:1.18
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
+  environment:
+    GOTOOLCHAIN: local
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
   commands:
   - cp go.mod go.mod.bak
   - go mod tidy
@@ -40,9 +52,16 @@ steps:
   - vet
 
 - name: golangci-lint
-  image: golangci/golangci-lint
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
+  environment:
+    GOTOOLCHAIN: local
+    GOPATH: /tmp/go
+    GOCACHE: /tmp/go-build
+    GOBIN: /tmp/lint-tools
+    GOLANGCI_LINT_CACHE: /tmp/golangci-lint-cache
   commands:
-  - golangci-lint run --timeout 500s --new-from-rev=HEAD~
+  - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+  - /tmp/lint-tools/golangci-lint run --timeout 500s --new-from-rev=HEAD~
   volumes:
   - name: gopath
     path: /go
