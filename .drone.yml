@@ -8,7 +8,7 @@ pool:
 
 steps:
 - name: vet
-  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
   environment:
     GOTOOLCHAIN: local
     GOPATH: /tmp/go
@@ -22,7 +22,7 @@ steps:
   - clone
 
 - name: test
-  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
   environment:
     GOTOOLCHAIN: local
     GOPATH: /tmp/go
@@ -36,7 +36,7 @@ steps:
   - vet
 
 - name: check go.mod is up to date
-  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
   environment:
     GOTOOLCHAIN: local
     GOPATH: /tmp/go
@@ -52,7 +52,7 @@ steps:
   - vet
 
 - name: golangci-lint
-  image: harness0.harness.io/oci/docker_artifacts/ubi9/go1:1.26.10-rfcurated@sha256:7bacb3818ae355f31ca9b24d387d83c12fd6082f328a88c79727ee501a4fb90d
+  image: golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
   environment:
     GOTOOLCHAIN: local
     GOPATH: /tmp/go
